@@ -3,19 +3,20 @@ import { api } from "../api";
 import { useAuth } from "../hooks/useAuth";
 import { useCollection, useDoc } from "../hooks/useFirestore";
 import { useLang } from "../i18n/translations";
-import { Choice2, LanguageSwitch, Stepper } from "../components/ui";
+import { Choice2, LanguageSwitch, Stepper, useOnline } from "../components/ui";
 
 const TESTS = ["malaria", "tb", "pregnancy", "diabetes", "hiv"];
 
 /**
- * PHC operator daily report — ported from the approved design (phone-first,
- * big steppers, plain language). Saves call the operator REST endpoints so the
- * backend recomputes forecasts + alerts on write (the live demo moment).
- * Staff attendance uses doctor/nurse counts per the API contract.
+ * PHC operator daily report. Responsive: single column on phones, two-column
+ * grid on larger screens (same compact sections, never a stretched phone strip).
+ * Saves call the operator REST endpoints so the backend recomputes forecasts +
+ * alerts on write (the live demo moment).
  */
 export default function MyCentre() {
   const { centreId, signOut } = useAuth();
   const { t, lang } = useLang();
+  const online = useOnline();
 
   const centre = useDoc(`centres/${centreId}`);
   const stockRows = useCollection(`centres/${centreId}/stock`);
@@ -29,21 +30,20 @@ export default function MyCentre() {
   const [stock, setStock] = useState({});
   const [tests, setTests] = useState({});
   const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState(null);
+  const [saved, setSaved] = useState(null); // {at, patients, docsPresent, docsTotal, bedsOccupied}
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (bedsDoc) setBedsOccupied(bedsDoc.occupied || 0);
   }, [bedsDoc]);
   useEffect(() => {
-    if (testsDoc) setTests(Object.fromEntries(TESTS.map((k) => [k, testsDoc[k] !== false])));
+    if (testsDoc)
+      setTests(Object.fromEntries(TESTS.map((k) => [k, testsDoc[k] !== false])));
   }, [testsDoc]);
   useEffect(() => {
     setStock(Object.fromEntries(stockRows.map((m) => [m.id, m.current_stock ?? 0])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(stockRows.map((m) => m.id + ":" + m.current_stock))]);
-
-  const online = typeof navigator !== "undefined" ? navigator.onLine : true;
 
   async function saveAll() {
     if (!centreId) return;
@@ -65,21 +65,34 @@ export default function MyCentre() {
         doctors_total: Math.max(docsTotal, 1),
       });
       await api.patch(`/api/centres/${centreId}/tests`, { tests });
-      setSavedAt(new Date());
+      setSaved({
+        at: new Date(),
+        patients,
+        docsPresent,
+        docsTotal,
+        bedsOccupied,
+        bedsTotal: bedsDoc?.total,
+      });
     } catch (e) {
-      setError(e?.error || "Could not send the report. Check the connection and try again.");
+      setError(
+        e?.error || "Could not send the report. Check the connection and try again."
+      );
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-phone flex-col bg-canvas">
-      <header className="rounded-b-card bg-brand-deep px-5 pb-4 pt-3 text-white">
+    <div className="mx-auto flex min-h-screen w-full max-w-phone flex-col bg-canvas md:max-w-4xl">
+      <header className="bg-brand-deep px-5 pb-4 pt-3 text-white md:rounded-b-card">
         <div className="flex items-center justify-between">
           <LanguageSwitch onDark />
-          <span className={`text-xs ${online ? "text-ondark-soft" : "text-status-warning"}`}>
-            {online ? "●" : "○"} {online ? "" : t("no_network")}
+          <span
+            className={`text-xs font-medium ${
+              online ? "text-ondark-soft" : "text-status-warning"
+            }`}
+          >
+            {online ? "●" : `○ ${t("no_network")}`}
           </span>
         </div>
         <div className="mt-2 flex items-end justify-between">
@@ -87,11 +100,10 @@ export default function MyCentre() {
             <h1 className="text-xl font-bold">{centre?.name || "…"}</h1>
             <p className="text-sm text-ondark-subtle">
               {centre?.location?.block} ·{" "}
-              {new Date().toLocaleDateString(lang === "en" ? "en-IN" : lang === "hi" ? "hi-IN" : "mr-IN", {
-                weekday: "short",
-                day: "numeric",
-                month: "long",
-              })}
+              {new Date().toLocaleDateString(
+                lang === "en" ? "en-IN" : lang === "hi" ? "hi-IN" : "mr-IN",
+                { weekday: "short", day: "numeric", month: "long" }
+              )}
             </p>
           </div>
           <button
@@ -103,100 +115,132 @@ export default function MyCentre() {
         </div>
       </header>
 
-      <main className="flex-1 space-y-4 px-4 pb-32 pt-4">
-        {savedAt && (
-          <section className="rounded-card border border-status-healthy/30 bg-status-healthy-soft p-4">
+      <main className="flex-1 px-4 pb-32 pt-4">
+        {saved && (
+          <section className="mb-4 rounded-card border border-status-healthy/30 bg-status-healthy-soft p-4">
             <p className="font-semibold text-status-healthy-deep">
               ✓ {online ? t("todays_report_sent") : t("saved_will_sync")}
             </p>
             <p className="mt-0.5 text-sm text-status-healthy-deep/80">
               {t("sent_at")}{" "}
-              {savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {saved.at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </p>
+            <div className="mt-3 flex gap-6 border-t border-status-healthy/20 pt-3">
+              <div>
+                <p className="tabular text-xl font-bold text-status-healthy-deep">
+                  {saved.patients}
+                </p>
+                <p className="text-xs text-status-healthy-deep/70">
+                  {t("patients_seen_today")}
+                </p>
+              </div>
+              <div>
+                <p className="tabular text-xl font-bold text-status-healthy-deep">
+                  {saved.docsPresent}/{saved.docsTotal}
+                </p>
+                <p className="text-xs text-status-healthy-deep/70">{t("staff_present")}</p>
+              </div>
+              <div>
+                <p className="tabular text-xl font-bold text-status-healthy-deep">
+                  {saved.bedsOccupied}
+                  {saved.bedsTotal ? `/${saved.bedsTotal}` : ""}
+                </p>
+                <p className="text-xs text-status-healthy-deep/70">{t("beds_section")}</p>
+              </div>
+            </div>
           </section>
         )}
         {error && (
-          <section className="rounded-card bg-status-critical-soft p-4 text-sm font-medium text-status-critical">
+          <section className="mb-4 rounded-card bg-status-critical-soft p-4 text-sm font-medium text-status-critical">
             {error}
           </section>
         )}
 
-        <section className="rounded-card border border-line bg-surface p-5">
-          <h2 className="font-semibold">{t("patients_seen_today")}</h2>
-          <div className="mt-4 flex justify-center">
-            <Stepper value={patients} onChange={setPatients} big />
-          </div>
-        </section>
+        <div className="grid gap-4 md:grid-cols-2 md:items-start">
+          {/* Left column: counts */}
+          <div className="space-y-4">
+            <section className="rounded-card border border-line bg-surface p-5">
+              <h2 className="font-semibold">{t("patients_seen_today")}</h2>
+              <div className="mt-4 flex justify-center">
+                <Stepper value={patients} onChange={setPatients} big />
+              </div>
+            </section>
 
-        <section className="rounded-card border border-line bg-surface p-5">
-          <h2 className="font-semibold">{t("beds_section")}</h2>
-          <p className="text-sm text-ink-muted">
-            {bedsOccupied} {t("of")} {bedsDoc?.total ?? "—"}
-          </p>
-          <div className="mt-4 flex justify-center">
-            <Stepper value={bedsOccupied} onChange={setBedsOccupied} />
-          </div>
-        </section>
-
-        <section className="rounded-card border border-line bg-surface p-5">
-          <h2 className="font-semibold">{t("staff_present_today")}</h2>
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm">
-                {t("present")} ({t("staff_present")})
+            <section className="rounded-card border border-line bg-surface p-5">
+              <h2 className="font-semibold">{t("beds_section")}</h2>
+              <p className="text-sm text-ink-muted">
+                {bedsOccupied} {t("of")} {bedsDoc?.total ?? "—"}
               </p>
-              <Stepper value={docsPresent} onChange={setDocsPresent} />
-            </div>
-            <div className="flex items-center justify-between border-t border-line-light pt-3">
-              <p className="text-sm text-ink-muted">{t("of")}</p>
-              <Stepper value={docsTotal} onChange={setDocsTotal} min={1} />
-            </div>
-          </div>
-        </section>
+              <div className="mt-4 flex justify-center">
+                <Stepper value={bedsOccupied} onChange={setBedsOccupied} />
+              </div>
+            </section>
 
-        <section className="rounded-card border border-line bg-surface p-5">
-          <h2 className="font-semibold">{t("medicine_stock")}</h2>
-          <p className="text-sm text-ink-muted">{t("how_much_left")}</p>
-          <ul className="mt-4 space-y-5">
-            {stockRows.map((m) => (
-              <li key={m.id} className="border-b border-line-light pb-4 last:border-0 last:pb-0">
-                <p className="font-medium">{m.medicine_name}</p>
-                <p className="text-xs text-ink-faint">{m.unit}</p>
-                <div className="mt-2 flex justify-center">
-                  <Stepper
-                    value={stock[m.id] ?? 0}
-                    onChange={(v) => setStock((s) => ({ ...s, [m.id]: v }))}
-                  />
+            <section className="rounded-card border border-line bg-surface p-5">
+              <h2 className="font-semibold">{t("staff_present_today")}</h2>
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm">{t("doctors_present_label")}</p>
+                  <Stepper value={docsPresent} onChange={setDocsPresent} />
                 </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+                <div className="flex items-center justify-between gap-3 border-t border-line-light pt-3">
+                  <p className="text-sm text-ink-muted">{t("total_doctors_label")}</p>
+                  <Stepper value={docsTotal} onChange={setDocsTotal} min={1} />
+                </div>
+              </div>
+            </section>
 
-        <section className="rounded-card border border-line bg-surface p-5">
-          <h2 className="font-semibold">{t("tests_section")}</h2>
-          <ul className="mt-4 space-y-3">
-            {TESTS.map((name) => (
-              <li key={name} className="flex items-center justify-between">
-                <p className="text-sm font-medium capitalize">{name}</p>
-                <Choice2
-                  value={tests[name]}
-                  onChange={(v) => setTests((tt) => ({ ...tt, [name]: v }))}
-                  onLabel={t("available")}
-                  offLabel={t("not_available")}
-                  danger
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
+            <section className="rounded-card border border-line bg-surface p-5">
+              <h2 className="font-semibold">{t("tests_section")}</h2>
+              <ul className="mt-4 space-y-3">
+                {TESTS.map((name) => (
+                  <li key={name} className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium capitalize">{name}</p>
+                    <Choice2
+                      value={tests[name]}
+                      onChange={(v) => setTests((tt) => ({ ...tt, [name]: v }))}
+                      onLabel={t("available")}
+                      offLabel={t("not_available")}
+                      danger
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </div>
+
+          {/* Right column: medicines */}
+          <section className="rounded-card border border-line bg-surface p-5">
+            <h2 className="font-semibold">{t("medicine_stock")}</h2>
+            <p className="text-sm text-ink-muted">{t("how_much_left")}</p>
+            <ul className="mt-4 space-y-5">
+              {stockRows.map((m) => (
+                <li
+                  key={m.id}
+                  className="border-b border-line-light pb-4 last:border-0 last:pb-0"
+                >
+                  <div className="flex items-baseline justify-between">
+                    <p className="font-medium">{m.medicine_name}</p>
+                    <p className="text-xs text-ink-faint">{m.unit}</p>
+                  </div>
+                  <div className="mt-2 flex justify-center">
+                    <Stepper
+                      value={stock[m.id] ?? 0}
+                      onChange={(v) => setStock((s) => ({ ...s, [m.id]: v }))}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-phone bg-gradient-to-t from-canvas via-canvas to-transparent p-4">
+      <div className="fixed inset-x-0 bottom-0 mx-auto w-full max-w-phone bg-gradient-to-t from-canvas via-canvas to-transparent p-4 md:max-w-4xl">
         <button
           onClick={saveAll}
           disabled={saving}
-          className="w-full rounded-card bg-brand py-4 text-lg font-semibold text-white disabled:opacity-60"
+          className="w-full rounded-card bg-brand py-4 text-lg font-semibold text-white hover:bg-brand-deep disabled:opacity-60"
         >
           {saving ? "…" : t("save_send_report")}
         </button>

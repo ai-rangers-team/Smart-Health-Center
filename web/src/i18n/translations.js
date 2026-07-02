@@ -74,6 +74,11 @@ export const translations = {
     patients_last_7: "Patients · last 7 days",
     footfall_last_30: "Patient footfall · last 30 days",
     bed_occupancy: "Bed occupancy",
+    active_alerts: "Active alerts",
+    resolve: "Resolve",
+    doctors_present_label: "Doctors present today",
+    total_doctors_label: "Total doctors",
+    report_includes: "Report includes",
   },
   hi: {
     app_name: "Smart Health Centre",
@@ -142,6 +147,11 @@ export const translations = {
     patients_last_7: "मरीज़ · पिछले 7 दिन",
     footfall_last_30: "मरीज़ों की संख्या · पिछले 30 दिन",
     bed_occupancy: "बिस्तर उपयोग",
+    active_alerts: "सक्रिय चेतावनियाँ",
+    resolve: "हल करें",
+    doctors_present_label: "आज उपस्थित डॉक्टर",
+    total_doctors_label: "कुल डॉक्टर",
+    report_includes: "रिपोर्ट में शामिल",
   },
   mr: {
     app_name: "Smart Health Centre",
@@ -210,6 +220,11 @@ export const translations = {
     patients_last_7: "रुग्ण · मागील 7 दिवस",
     footfall_last_30: "रुग्णसंख्या · मागील 30 दिवस",
     bed_occupancy: "खाटांचा वापर",
+    active_alerts: "सक्रिय इशारे",
+    resolve: "निकाली काढा",
+    doctors_present_label: "आज उपस्थित डॉक्टर",
+    total_doctors_label: "एकूण डॉक्टर",
+    report_includes: "अहवालात समाविष्ट",
   },
 };
 
