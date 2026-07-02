@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function role() { return request.auth.token.role; }
+    function ownCentre(cid) { return request.auth.token.centre_id == cid; }
+
+    match /districts/{d} { allow read: if signedIn(); allow write: if false; }
+    match /centres/{cid} {
+      allow read: if signedIn();
+      allow write: if role() == 'phc_operator' && ownCentre(cid);
+      match /{sub=**} {
+        allow read: if signedIn();
+        allow write: if role() == 'phc_operator' && ownCentre(cid);
+      }
+    }
+    match /alerts/{a} { allow read: if signedIn(); allow write: if false; }        // backend-only via admin SDK
+    match /recommendations/{r} { allow read: if signedIn(); allow write: if false; }
+    match /users/{u} { allow read: if signedIn() && request.auth.uid == u; allow write: if false; }
+  }
+}
