@@ -469,12 +469,18 @@ def test_footfall_trend_falling():
 from datetime import datetime, timedelta, timezone
 
 def ewma(series: list[float], alpha: float = 0.3) -> float:
+    # Normalized recency-weighted average: newest gets weight 1, older decay by (1-alpha).
+    # NOTE: the naive seeded recursion (acc=series[0]; acc=alpha*x+(1-alpha)*acc) over-weights
+    # the OLDEST value on short series with alpha<0.5, contradicting "recent weighted higher".
     if not series:
         return 0.0
-    acc = series[0]
-    for x in series[1:]:
-        acc = alpha * x + (1 - alpha) * acc
-    return acc
+    n = len(series)
+    num = den = 0.0
+    for i, x in enumerate(series):
+        w = (1 - alpha) ** (n - 1 - i)  # newest (i=n-1) -> weight 1.0
+        num += w * x
+        den += w
+    return num / den
 
 def forecast_stockout(history: list[float], current_stock: float) -> dict:
     rate = ewma(history)
