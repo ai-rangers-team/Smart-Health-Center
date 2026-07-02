@@ -2,18 +2,19 @@
 
 Run: python -m scripts.verify_gemini   (from the api/ directory, with api/.env present)
 """
-import google.generativeai as genai
+from google import genai
 from app.config import settings
 
-genai.configure(api_key=settings.gemini_api_key)
+client = genai.Client(api_key=settings.gemini_api_key)
 
 print("Flash models supporting generateContent:")
-for m in genai.list_models():
-    if "generateContent" in m.supported_generation_methods and "flash" in m.name:
+for m in client.models.list():
+    actions = getattr(m, "supported_actions", None) or []
+    if "generateContent" in actions and "flash" in m.name:
         print(" ", m.name)
 
 print(f"\nConfigured GEMINI_MODEL = {settings.gemini_model}")
-resp = genai.GenerativeModel(settings.gemini_model).generate_content(
-    "Reply with the single word: OK"
+resp = client.models.generate_content(
+    model=settings.gemini_model, contents="Reply with the single word: OK"
 )
 print("Live call response:", resp.text.strip())

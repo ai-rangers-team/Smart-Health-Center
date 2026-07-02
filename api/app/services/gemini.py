@@ -5,11 +5,10 @@ matches) into human-readable text. It is NEVER on the live operator-write path â
 these functions enrich, they don't gate. `generate` swallows errors and returns ""
 so a Gemini hiccup can never break a request.
 """
-import google.generativeai as genai
+from google import genai
 from app.config import settings
 
-genai.configure(api_key=settings.gemini_api_key)
-_model = genai.GenerativeModel(settings.gemini_model)
+_client = genai.Client(api_key=settings.gemini_api_key)
 
 _LANG = {"en": "English", "hi": "Hindi", "mr": "Marathi"}
 
@@ -17,7 +16,8 @@ _LANG = {"en": "English", "hi": "Hindi", "mr": "Marathi"}
 def generate(prompt: str, language: str = "mr") -> str:
     full = f"{prompt}\n\nRespond in {_LANG.get(language, 'English')}. Be concise."
     try:
-        return _model.generate_content(full).text.strip()
+        resp = _client.models.generate_content(model=settings.gemini_model, contents=full)
+        return (resp.text or "").strip()
     except Exception:
         return ""
 
