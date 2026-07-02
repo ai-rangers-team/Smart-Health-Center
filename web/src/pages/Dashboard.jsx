@@ -45,6 +45,16 @@ export default function Dashboard() {
     }
   };
 
+  const [resolved, setResolved] = useState({});
+  const resolveAlert = async (id) => {
+    try {
+      await api.post(`/api/alerts/${id}/resolve`);
+      setResolved((r) => ({ ...r, [id]: true }));
+    } catch {
+      /* keep visible on failure */
+    }
+  };
+
   const critical = alerts.filter((a) => a.severity === "critical").length;
   const beds = centres.reduce(
     (acc, c) => ({
@@ -57,6 +67,11 @@ export default function Dashboard() {
     (a, b) => (STATUS_ORDER[statusKey(a)] ?? 3) - (STATUS_ORDER[statusKey(b)] ?? 3)
   );
   const pending = recommendations.filter((r) => r.status === "pending" && !acked[r.id]);
+
+  const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+  const activeAlerts = alerts
+    .filter((a) => !resolved[a.id])
+    .sort((a, b) => (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3));
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -113,6 +128,37 @@ export default function Dashboard() {
           <StatTile label={t("all_centres")} value={centres.length} sub={t("district_view")} />
         </section>
 
+        <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+        {activeAlerts.length > 0 && (
+          <section className="rounded-card border border-line bg-surface p-6">
+            <h2 className="text-lg font-semibold">{t("active_alerts")}</h2>
+            <ul className="mt-4 divide-y divide-line-light">
+              {activeAlerts.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex flex-col gap-2 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex items-start gap-3">
+                    <StatusBadge status={a.severity}>
+                      {a.severity === "critical" ? t("critical") : t("warning")}
+                    </StatusBadge>
+                    <div>
+                      <p className="text-sm font-medium">{a.centre_name}</p>
+                      <p className="text-sm text-ink-muted">{a.message}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => resolveAlert(a.id)}
+                    className="shrink-0 self-start rounded-action border border-line-control px-4 py-2 text-sm font-semibold text-ink hover:bg-line-light sm:self-center"
+                  >
+                    {t("resolve")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {pending.length > 0 && (
           <section className="rounded-card border border-line bg-surface p-6">
             <h2 className="text-lg font-semibold">{t("ai_recommendations")}</h2>
@@ -142,6 +188,7 @@ export default function Dashboard() {
             </ul>
           </section>
         )}
+        </div>
 
         <section>
           <div className="flex items-center justify-between">

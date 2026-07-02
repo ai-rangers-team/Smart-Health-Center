@@ -1,0 +1,17 @@
+{
+  "name": "Smart Health Centre",
+  "short_name": "SHC",
+  "description": "District health centre monitoring and daily reporting",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F3EE",
+  "theme_color": "#0A3D33",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
