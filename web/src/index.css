@@ -3,10 +3,17 @@
 @tailwind utilities;
 
 body {
-  @apply bg-paper text-ink font-sans antialiased;
+  @apply bg-canvas text-ink font-sans antialiased;
 }
 
-/* Numbers line up in tables and stat tiles */
+/* Numbers line up in tables, stat tiles, and counters */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

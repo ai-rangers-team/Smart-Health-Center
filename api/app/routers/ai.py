@@ -111,6 +111,22 @@ def redistribution(district_id: str, lang: str = Query("mr"), user=Depends(get_c
     return ok({"recommendations": recs})
 
 
+# Separate prefix: recommendations are created by the redistribution endpoint
+# above, and acknowledged by the district admin from the dashboard.
+recs_router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
+
+
+@recs_router.post("/{recommendation_id}/acknowledge")
+def acknowledge_recommendation(recommendation_id: str, user=Depends(get_current_user)):
+    """District admin acknowledges a redistribution recommendation."""
+    if user.get("role") != "district_admin":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+    _db().collection("recommendations").document(recommendation_id).update(
+        {"status": "acknowledged"})
+    return ok({"acknowledged": True})
+
+
 @router.post("/explain-underperformance/{centre_id}")
 def explain_underperformance(centre_id: str, lang: str = Query("mr"), user=Depends(get_current_user)):
     db = _db()
