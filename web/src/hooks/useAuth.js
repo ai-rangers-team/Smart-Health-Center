@@ -5,12 +5,31 @@ import {
   signOut as fbSignOut,
 } from "firebase/auth";
 import { auth, googleProvider } from "../firebase";
+import { PREVIEW, previewRole } from "../dev/preview";
 
 /**
  * Auth state + role from Firebase custom claims.
  * role: undefined = still loading / signed out; null = signed in but not provisioned.
  */
 export function useAuth() {
+  // Dev-only preview harness (VITE_PREVIEW=1): fake identity, no Firebase.
+  if (PREVIEW) {
+    const role = previewRole();
+    return {
+      user: { displayName: "Dr. A. Deshmukh", email: "preview@local" },
+      role,
+      centreId: role === "phc_operator" ? "phc_mulshi" : null,
+      districtId: "pune_rural",
+      loading: false,
+      signIn: () => {},
+      signOut: () => {},
+    };
+  }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useRealAuth();
+}
+
+function useRealAuth() {
   const [user, setUser] = useState(null);
   const [claims, setClaims] = useState({});
   const [role, setRole] = useState(undefined);
