@@ -26,6 +26,7 @@ def create_app() -> FastAPI:
     # API routers MUST be registered before the catch-all static mount below,
     # otherwise StaticFiles at "/" shadows every /api/* route and returns 404.
     app.include_router(ai.router)
+    app.include_router(ai.recs_router)
 
     if os.path.isdir("static"):
         app.mount("/", StaticFiles(directory="static", html=True), name="static")
