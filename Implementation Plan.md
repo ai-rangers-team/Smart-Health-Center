@@ -78,6 +78,29 @@ smart-health/
 
 **Parallelization:** Within each phase, tasks are grouped by owner (BE = backend core, AI = forecasting/Gemini, FE = frontend, IN = infra). Tasks in different groups within a phase can run concurrently once their listed dependencies are met.
 
+## Progress Notes (updated July 3)
+
+Checkboxes reflect ATTESTED work only — a step stays unchecked if it could not
+be verified yet, even when the code is written. Current blockers and deviations:
+
+- **Unchecked verify steps (0.4/1.6/1.7/1.8/2.7/2.8/3.1/3.2)** are all gated on:
+  (a) Firebase web-app config for `web/.env` (ISHA), (b) service-account creds +
+  `firestore_client.py` lazy-init fix (ISHA), (c) seed + operator endpoints,
+  tasks 1.4/2.1/2.5 (DEVIK).
+- **Deviation — Tasks 1.5/2.6/3.1 read routes:** the frontend reads centre
+  subcollections directly via Firestore `onSnapshot` (real-time for free), so
+  the REST read endpoints for stock/beds/attendance/footfall/tests/overview are
+  NOT needed unless we later want non-Firestore clients. Devik: don't build
+  them without checking first.
+- **Deviation — data contract addition:** centre docs carry denormalized summary
+  fields (`footfall_today`, `beds_total`, `beds_occupied`, `beds_available`)
+  written by seed + recompute; beds/tests live at `centres/{id}/beds/current`
+  and `centres/{id}/tests/current`.
+- **Additions beyond plan (done):** dev preview harness (`VITE_PREVIEW=1`,
+  `/?role=admin|operator`), PWA manifest + icon, Active Alerts panel with
+  `POST /api/alerts/{id}/resolve`, recommendations acknowledge endpoint,
+  language dropdown, responsive operator page, google-genai SDK migration.
+
 ---
 
 ## Phase 0 — Day 0: Setup & Foundations
@@ -91,7 +114,7 @@ smart-health/
 **Interfaces:**
 - Produces: FastAPI `app` in `app.main`; `Settings` in `app.config` exposing `gemini_model: str`, `gemini_api_key: str`, `seed_enabled: bool`, `allowed_origin: str`.
 
-- [ ] **Step 1: Write requirements.txt**
+- [x] **Step 1: Write requirements.txt**
 ```
 fastapi==0.115.*
 uvicorn[standard]==0.32.*
@@ -104,7 +127,7 @@ pytest==8.3.*
 httpx==0.27.*
 ```
 
-- [ ] **Step 2: Write `app/config.py`**
+- [x] **Step 2: Write `app/config.py`**
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -119,7 +142,7 @@ class Settings(BaseSettings):
 settings = Settings()
 ```
 
-- [ ] **Step 3: Write the failing test for the health endpoint**
+- [x] **Step 3: Write the failing test for the health endpoint**
 ```python
 # tests/test_endpoints.py
 from fastapi.testclient import TestClient
@@ -133,9 +156,9 @@ def test_health_ok():
     assert r.json() == {"status": "ok"}
 ```
 
-- [ ] **Step 4: Run it, expect failure** — `cd smart-health/api && pytest tests/test_endpoints.py -v` → FAIL (no `app.main`).
+- [x] **Step 4: Run it, expect failure** — `cd smart-health/api && pytest tests/test_endpoints.py -v` → FAIL (no `app.main`).
 
-- [ ] **Step 5: Write `app/main.py`**
+- [x] **Step 5: Write `app/main.py`**
 ```python
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -163,9 +186,9 @@ def create_app() -> FastAPI:
 app = create_app()
 ```
 
-- [ ] **Step 6: Run test, expect PASS.**
+- [x] **Step 6: Run test, expect PASS.**
 
-- [ ] **Step 7: Write `.env.example`**
+- [x] **Step 7: Write `.env.example`**
 ```
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_API_KEY=
@@ -174,7 +197,7 @@ ALLOWED_ORIGIN=http://localhost:5173
 FIREBASE_CREDENTIALS_PATH=
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 ```bash
 git add smart-health/api smart-health/README.md
 git commit -m "feat: backend skeleton with health endpoint"
@@ -187,7 +210,7 @@ git commit -m "feat: backend skeleton with health endpoint"
 **Interfaces:**
 - Produces: `gemini.generate(prompt: str, language: str = "mr") -> str` returning plain text.
 
-- [ ] **Step 1: Write `scripts/verify_gemini.py`** (run once, confirms the live model id)
+- [x] **Step 1: Write `scripts/verify_gemini.py`** (run once, confirms the live model id)
 ```python
 import google.generativeai as genai
 from app.config import settings
@@ -199,9 +222,9 @@ for m in genai.list_models():
         print(" ", m.name)
 ```
 
-- [ ] **Step 2: Run it** — `python -m scripts.verify_gemini`. Expected: a list including `models/gemini-2.5-flash` (or a newer flash). **If `gemini-2.5-flash` is absent, update `GEMINI_MODEL` in `.env` to the newest listed flash id and note it in README.**
+- [x] **Step 2: Run it** — `python -m scripts.verify_gemini`. Expected: a list including `models/gemini-2.5-flash` (or a newer flash). **If `gemini-2.5-flash` is absent, update `GEMINI_MODEL` in `.env` to the newest listed flash id and note it in README.**
 
-- [ ] **Step 3: Write `app/services/gemini.py`**
+- [x] **Step 3: Write `app/services/gemini.py`**
 ```python
 import google.generativeai as genai
 from app.config import settings
@@ -219,9 +242,9 @@ def generate(prompt: str, language: str = "mr") -> str:
         return ""
 ```
 
-- [ ] **Step 4: Manual spike** — a throwaway call `generate("Summarise: PHC Mulshi paracetamol runs out in 3 days.", "en")` prints a real sentence. Confirm non-empty.
+- [x] **Step 4: Manual spike** — a throwaway call `generate("Summarise: PHC Mulshi paracetamol runs out in 3 days.", "en")` prints a real sentence. Confirm non-empty.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 ```bash
 git add smart-health/api/app/services/gemini.py smart-health/api/scripts
 git commit -m "feat: gemini client + live model verification"
@@ -234,9 +257,9 @@ git commit -m "feat: gemini client + live model verification"
 **Interfaces:**
 - Produces: `db` (Firestore client), `verify_id_token(token: str) -> dict` (wraps `firebase_admin.auth.verify_id_token`).
 
-- [ ] **Step 1: In the GCP console** enable Firestore (Native mode), Firebase Auth (Google provider), and generate a service-account key. Store its path in `.env` `FIREBASE_CREDENTIALS_PATH` (do NOT commit the JSON; add `*serviceaccount*.json` to `.gitignore`).
+- [x] **Step 1: In the GCP console** enable Firestore (Native mode), Firebase Auth (Google provider), and generate a service-account key. Store its path in `.env` `FIREBASE_CREDENTIALS_PATH` (do NOT commit the JSON; add `*serviceaccount*.json` to `.gitignore`).
 
-- [ ] **Step 2: Write `app/firestore_client.py`**
+- [x] **Step 2: Write `app/firestore_client.py`**
 ```python
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
@@ -255,7 +278,7 @@ def verify_id_token(token: str) -> dict:
 
 - [ ] **Step 3: Manual verify** — a throwaway script writes then reads a `/_ping` doc; confirm it round-trips in the Firestore console.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 ```bash
 git add smart-health/api/app/firestore_client.py smart-health/api/.gitignore
 git commit -m "feat: firestore + firebase-admin client"
@@ -268,9 +291,9 @@ git commit -m "feat: firestore + firebase-admin client"
 **Interfaces:**
 - Produces: `auth`, `db`, `googleProvider` from `firebase.js`; a working Google Sign-In button on `/` that logs the ID token to console.
 
-- [ ] **Step 1: Scaffold** — `npm create vite@latest web -- --template react`, then `npm i firebase axios recharts` and set up TailwindCSS (`npm i -D tailwindcss postcss autoprefixer && npx tailwindcss init -p`, configure `content` + `@tailwind` directives).
+- [x] **Step 1: Scaffold** — `npm create vite@latest web -- --template react`, then `npm i firebase axios recharts` and set up TailwindCSS (`npm i -D tailwindcss postcss autoprefixer && npx tailwindcss init -p`, configure `content` + `@tailwind` directives).
 
-- [ ] **Step 2: Write `web/.env.example`** (Vite needs `VITE_` prefix)
+- [x] **Step 2: Write `web/.env.example`** (Vite needs `VITE_` prefix)
 ```
 VITE_FIREBASE_API_KEY=
 VITE_FIREBASE_AUTH_DOMAIN=
@@ -278,7 +301,7 @@ VITE_FIREBASE_PROJECT_ID=
 VITE_API_BASE=http://localhost:8000
 ```
 
-- [ ] **Step 3: Write `web/src/firebase.js`**
+- [x] **Step 3: Write `web/src/firebase.js`**
 ```javascript
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
@@ -295,11 +318,11 @@ export const googleProvider = new GoogleAuthProvider();
 export const db = initializeFirestore(app, { localCache: persistentLocalCache() });
 ```
 
-- [ ] **Step 4: Temporary sign-in button in `App.jsx`** calling `signInWithPopup(auth, googleProvider)` then `user.getIdToken().then(console.log)`.
+- [x] **Step 4: Temporary sign-in button in `App.jsx`** calling `signInWithPopup(auth, googleProvider)` then `user.getIdToken().then(console.log)`.
 
 - [ ] **Step 5: Verify** — `npm run dev`, click sign-in, confirm a Google account signs in and an ID token prints. (Add `localhost` is already an authorized domain by default.)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 ```bash
 git add smart-health/web
 git commit -m "feat: web scaffold + firebase auth on localhost"
@@ -316,7 +339,7 @@ git commit -m "feat: web scaffold + firebase auth on localhost"
 **Interfaces:**
 - Produces: `ok(data) -> dict`, `Medicine`, `StockUpdate`, `BedsUpdate`, `FootfallLog`, `AttendanceLog`, `TestsUpdate` models used by routers.
 
-- [ ] **Step 1: Write `schemas.py`**
+- [x] **Step 1: Write `schemas.py`**
 ```python
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
@@ -349,7 +372,7 @@ class TestsUpdate(BaseModel):
     tests: dict[str, bool]
 ```
 
-- [ ] **Step 2: Commit** — `git add app/models/schemas.py && git commit -m "feat: pydantic schemas + response envelope"`
+- [x] **Step 2: Commit** — `git add app/models/schemas.py && git commit -m "feat: pydantic schemas + response envelope"`
 
 ### Task 1.2 (BE): Auth dependency + role guards (TDD)
 
@@ -359,7 +382,7 @@ class TestsUpdate(BaseModel):
 - Consumes: `verify_id_token` (Task 0.3).
 - Produces: `get_current_user() -> dict` with keys `uid, email, role, district_id, centre_id` (role/others `None` when claim absent); `require_role(role)` guard factory; `require_own_centre(centre_id, user)`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 ```python
 # tests/test_auth.py
 import pytest
@@ -390,9 +413,9 @@ def test_require_role_rejects_wrong_role():
     assert e.value.status_code == 403
 ```
 
-- [ ] **Step 2: Run, expect FAIL.**
+- [x] **Step 2: Run, expect FAIL.**
 
-- [ ] **Step 3: Write `app/deps.py`**
+- [x] **Step 3: Write `app/deps.py`**
 ```python
 from fastapi import Header, HTTPException, Depends
 from app.firestore_client import verify_id_token
@@ -428,9 +451,9 @@ def require_own_centre(centre_id: str, user: dict):
         raise HTTPException(status_code=403, detail="Not your centre")
 ```
 
-- [ ] **Step 4: Run, expect PASS.**
+- [x] **Step 4: Run, expect PASS.**
 
-- [ ] **Step 5: Commit** — `git commit -am "feat: auth dependency + role guards"`
+- [x] **Step 5: Commit** — `git commit -am "feat: auth dependency + role guards"`
 
 ### Task 1.3 (AI): EWMA forecasting (TDD)
 
@@ -439,7 +462,7 @@ def require_own_centre(centre_id: str, user: dict):
 **Interfaces:**
 - Produces: `ewma(series: list[float], alpha=0.3) -> float`; `forecast_stockout(history: list[float], current_stock: float) -> dict` with keys `days_remaining, daily_consumption_forecast, predicted_stockout_date, severity, trend`; `forecast_footfall(history: list[int]) -> dict` with keys `projection, trend`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 ```python
 # tests/test_forecasting.py
 from app.services import forecasting as f
@@ -462,9 +485,9 @@ def test_footfall_trend_falling():
     assert r["trend"] == "falling"
 ```
 
-- [ ] **Step 2: Run, expect FAIL.**
+- [x] **Step 2: Run, expect FAIL.**
 
-- [ ] **Step 3: Write `app/services/forecasting.py`**
+- [x] **Step 3: Write `app/services/forecasting.py`**
 ```python
 from datetime import datetime, timedelta, timezone
 
@@ -506,8 +529,8 @@ def forecast_footfall(history: list[int]) -> dict:
     return {"projection": round(rate), "trend": trend}
 ```
 
-- [ ] **Step 4: Run, expect PASS.**
-- [ ] **Step 5: Commit** — `git commit -am "feat: EWMA stock-out + footfall forecasting"`
+- [x] **Step 4: Run, expect PASS.**
+- [x] **Step 5: Commit** — `git commit -am "feat: EWMA stock-out + footfall forecasting"`
 
 ### Task 1.4 (BE): Minimal seed — provision accounts + one centre's stock
 
@@ -632,7 +655,7 @@ def get_stock(centre_id: str, user=Depends(get_current_user)):
 - Consumes: `forecast_stockout`, `gemini.generate`, `db`.
 - Produces: `GET /api/ai/forecast/{centre_id}` → `ok({medicines:[...], narrative: "<gemini text>"})`.
 
-- [ ] **Step 1: Write `app/routers/ai.py`**
+- [x] **Step 1: Write `app/routers/ai.py`**
 ```python
 from fastapi import APIRouter, Depends, Query
 from app.deps import get_current_user
@@ -660,7 +683,7 @@ def forecast(centre_id: str, lang: str = Query("mr"), user=Depends(get_current_u
 
 - [ ] **Step 2: Mount router. Manual verify** — `curl .../api/ai/forecast/phc_mulshi?lang=en` returns medicines + a non-empty narrative sentence.
 
-- [ ] **Step 3: Commit** — `git commit -am "feat: AI forecast endpoint with gemini narrative"`
+- [x] **Step 3: Commit** — `git commit -am "feat: AI forecast endpoint with gemini narrative"`
 
 ### Task 1.7 (FE): Login, role routing, not-provisioned, useAuth
 
@@ -670,7 +693,7 @@ def forecast(centre_id: str, lang: str = Query("mr"), user=Depends(get_current_u
 - Consumes: `auth`, `googleProvider`, ID-token custom claims.
 - Produces: `useAuth() -> {user, role, loading, signIn, signOut}` where `role` comes from `getIdTokenResult().claims.role`; axios `api` instance that injects the token and unwraps the envelope.
 
-- [ ] **Step 1: Write `web/src/api.js`**
+- [x] **Step 1: Write `web/src/api.js`**
 ```javascript
 import axios from "axios";
 import { auth } from "./firebase";
@@ -687,7 +710,7 @@ api.interceptors.response.use(
 );
 ```
 
-- [ ] **Step 2: Write `web/src/hooks/useAuth.js`**
+- [x] **Step 2: Write `web/src/hooks/useAuth.js`**
 ```javascript
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut as fbSignOut } from "firebase/auth";
@@ -713,7 +736,7 @@ export function useAuth() {
 }
 ```
 
-- [ ] **Step 3: Write `App.jsx` routing**
+- [x] **Step 3: Write `App.jsx` routing**
 ```javascript
 import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/Login";
@@ -731,11 +754,11 @@ export default function App() {
 }
 ```
 
-- [ ] **Step 4: Write `Login.jsx` and `NotProvisioned.jsx`** — Login: product title + "Sign in with Google" button calling `onSignIn`. NotProvisioned: "Account not yet provisioned — contact your district admin" + email + sign-out. (Visual polish via Claude Design later; functional now.)
+- [x] **Step 4: Write `Login.jsx` and `NotProvisioned.jsx`** — Login: product title + "Sign in with Google" button calling `onSignIn`. NotProvisioned: "Account not yet provisioned — contact your district admin" + email + sign-out. (Visual polish via Claude Design later; functional now.)
 
 - [ ] **Step 5: Verify** — sign in with an account that has NO claim → NotProvisioned screen. Provision it (seed), refresh → routes to the correct role stub.
 
-- [ ] **Step 6: Commit** — `git commit -am "feat: login, role routing, not-provisioned, useAuth + api client"`
+- [x] **Step 6: Commit** — `git commit -am "feat: login, role routing, not-provisioned, useAuth + api client"`
 
 ### Task 1.8 (FE): useFirestore onSnapshot — one live card
 
@@ -744,7 +767,7 @@ export default function App() {
 **Interfaces:**
 - Produces: `useCollection(path, constraints?) -> array` re-rendering on `onSnapshot`; `useDoc(path) -> object|null`.
 
-- [ ] **Step 1: Write `web/src/hooks/useFirestore.js`**
+- [x] **Step 1: Write `web/src/hooks/useFirestore.js`**
 ```javascript
 import { useEffect, useState } from "react";
 import { collection, doc, onSnapshot, query } from "firebase/firestore";
@@ -768,7 +791,7 @@ export function useDoc(path) {
 
 - [ ] **Step 2: Verify live update** — a temporary component renders `useDoc("centres/phc_mulshi").status`; change the field in Firestore console; the screen updates within ~1–2s without refresh. **This proves the real-time backbone.**
 
-- [ ] **Step 3: Commit** — `git commit -am "feat: firestore onSnapshot hooks + live update proof"`
+- [x] **Step 3: Commit** — `git commit -am "feat: firestore onSnapshot hooks + live update proof"`
 
 **Day 1 gate:** Log in as admin → see PHC Mulshi's stock (paracetamol, 3 days, critical) → hit `/api/ai/forecast` → get a Gemini narrative. A Firestore console edit updates the UI live.
 
@@ -811,7 +834,7 @@ def _days(n):
 **Interfaces:**
 - Produces: `compute_performance_score(centre: dict) -> {score:int, flags:list[str], status:str}`. Input keys: `avg_attendance_rate`, `avg_footfall`, `district_avg_footfall`, `critical_stockouts:int`, `bed_occupancy_rate`, `essential_tests_unavailable:int`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 ```python
 from app.services.scoring import compute_performance_score
 
@@ -829,9 +852,9 @@ def test_velhe_flagged_underperforming():
     assert any("attendance" in f.lower() for f in r["flags"])
 ```
 
-- [ ] **Step 2: Run, expect FAIL.**
+- [x] **Step 2: Run, expect FAIL.**
 
-- [ ] **Step 3: Write `app/services/scoring.py`** (weights per spec §6.3: attendance 25, footfall 20, stockouts 20, beds 15, tests 20)
+- [x] **Step 3: Write `app/services/scoring.py`** (weights per spec §6.3: attendance 25, footfall 20, stockouts 20, beds 15, tests 20)
 ```python
 def compute_performance_score(c: dict) -> dict:
     score, flags = 100, []
@@ -855,7 +878,7 @@ def compute_performance_score(c: dict) -> dict:
     return {"score": score, "flags": flags, "status": status}
 ```
 
-- [ ] **Step 4: Run, expect PASS. Commit** — `git commit -am "feat: underperformance scoring"`
+- [x] **Step 4: Run, expect PASS. Commit** — `git commit -am "feat: underperformance scoring"`
 
 ### Task 2.3 (AI): Redistribution engine (TDD)
 
@@ -864,7 +887,7 @@ def compute_performance_score(c: dict) -> dict:
 **Interfaces:**
 - Produces: `compute_redistribution(centres: list[dict]) -> list[dict]`. Each centre: `{id, name, stock: {med: {current_stock, reorder_level, daily_avg, days_remaining}}}`. Output items: `{from_centre, to_centre, medicine, quantity, urgency}`.
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 ```python
 from app.services.redistribution import compute_redistribution
 
@@ -879,9 +902,9 @@ def test_surplus_flows_to_deficit():
     assert recs[0]["quantity"] > 0
 ```
 
-- [ ] **Step 2: Run, expect FAIL.**
+- [x] **Step 2: Run, expect FAIL.**
 
-- [ ] **Step 3: Write `app/services/redistribution.py`**
+- [x] **Step 3: Write `app/services/redistribution.py`**
 ```python
 def compute_redistribution(centres: list[dict]) -> list[dict]:
     recs = []
@@ -910,7 +933,7 @@ def compute_redistribution(centres: list[dict]) -> list[dict]:
     return recs
 ```
 
-- [ ] **Step 4: Run, expect PASS. Commit** — `git commit -am "feat: greedy redistribution engine"`
+- [x] **Step 4: Run, expect PASS. Commit** — `git commit -am "feat: greedy redistribution engine"`
 
 ### Task 2.4 (BE): Alert generation — templates, Gemini-free (TDD)
 
@@ -1120,7 +1143,7 @@ def alerts(district_id: str, resolved: bool = Query(False), user=Depends(get_cur
 **Interfaces:**
 - Produces: `GET /api/ai/district-briefing/{district_id}` (cached 15 min, invalidated on new critical alert); `POST /api/ai/redistribution/{district_id}` (writes `/recommendations`); `POST /api/ai/explain-underperformance/{centre_id}`.
 
-- [ ] **Step 1: Add briefing with in-memory cache**
+- [x] **Step 1: Add briefing with in-memory cache**
 ```python
 import time
 _cache = {}  # district_id -> (text, expires_at, critical_count)
@@ -1142,7 +1165,7 @@ def briefing(district_id: str, lang: str = "mr", user=Depends(get_current_user))
     return ok({"briefing": text, "cached": False})
 ```
 
-- [ ] **Step 2: Add redistribution** — read all centres' stock, shape into the `compute_redistribution` input, call it, Gemini-phrase each, write to `/recommendations`, return them.
+- [x] **Step 2: Add redistribution** — read all centres' stock, shape into the `compute_redistribution` input, call it, Gemini-phrase each, write to `/recommendations`, return them.
 ```python
 @router.post("/redistribution/{district_id}")
 def redistribution(district_id: str, lang: str = "mr", user=Depends(get_current_user)):
@@ -1167,7 +1190,7 @@ def redistribution(district_id: str, lang: str = "mr", user=Depends(get_current_
     return ok({"recommendations": recs})
 ```
 
-- [ ] **Step 3: Add explain-underperformance** — read centre flags (recompute or stored), Gemini-explain.
+- [x] **Step 3: Add explain-underperformance** — read centre flags (recompute or stored), Gemini-explain.
 ```python
 @router.post("/explain-underperformance/{centre_id}")
 def explain(centre_id: str, lang: str = "mr", user=Depends(get_current_user)):
@@ -1181,7 +1204,7 @@ def explain(centre_id: str, lang: str = "mr", user=Depends(get_current_user)):
 
 - [ ] **Step 4: Verify** all three via curl; confirm `/recommendations` docs appear and briefing caches (second call returns `cached:true`).
 
-- [ ] **Step 5: Commit** — `git commit -am "feat: briefing (cached), redistribution, explain endpoints"`
+- [x] **Step 5: Commit** — `git commit -am "feat: briefing (cached), redistribution, explain endpoints"`
 
 ### Task 2.8 (FE): Dashboard UI (Claude Design against the data contract)
 
@@ -1190,13 +1213,13 @@ def explain(centre_id: str, lang: str = "mr", user=Depends(get_current_user)):
 **Interfaces:**
 - Consumes: `useCollection("centres",[where("district_id","==",id)])`, `useCollection("alerts",[where("district_id","==",id),where("resolved","==",false)])`, `api.get("/api/ai/district-briefing/...")`, `api.post("/api/ai/redistribution/...")`.
 
-- [ ] **Step 1: Generate the visual components with Claude Design.** Provide Claude Design this exact data contract and layout brief: Navbar (district name, EN/HI/MR toggle, avatar) · StatBar (total centres, critical count, beds available) · BriefingCard (text from briefing endpoint) · CentreGrid (cards: name, type, status color [operational=green, under_resourced=amber, critical=red], performance_score, top alert) · AlertsPanel (severity-sorted list) · RecoPanel (recommendation gemini_message + Acknowledge button). Live data via the hooks above; briefing/reco via `api`.
+- [x] **Step 1: Generate the visual components with Claude Design.** Provide Claude Design this exact data contract and layout brief: Navbar (district name, EN/HI/MR toggle, avatar) · StatBar (total centres, critical count, beds available) · BriefingCard (text from briefing endpoint) · CentreGrid (cards: name, type, status color [operational=green, under_resourced=amber, critical=red], performance_score, top alert) · AlertsPanel (severity-sorted list) · RecoPanel (recommendation gemini_message + Acknowledge button). Live data via the hooks above; briefing/reco via `api`.
 
-- [ ] **Step 2: Wire real-time** — CentreGrid + AlertsPanel bind to `useCollection` so an operator write updates them live. Clicking a centre routes to `/centre/:id` (Task 3.1).
+- [x] **Step 2: Wire real-time** — CentreGrid + AlertsPanel bind to `useCollection` so an operator write updates them live. Clicking a centre routes to `/centre/:id` (Task 3.1).
 
 - [ ] **Step 3: Verify** — as admin, the dashboard shows 6 centres with correct colours, ~4 active alerts, a briefing sentence, and (after POST redistribution) recommendation cards. In a second tab as Mulshi operator, change stock → admin dashboard updates live.
 
-- [ ] **Step 4: Commit** — `git commit -am "feat: district admin dashboard (live)"`
+- [x] **Step 4: Commit** — `git commit -am "feat: district admin dashboard (live)"`
 
 **Day 2 gate:** Dashboard shows all 6 centres, alerts, Gemini briefing + recommendations. Operator write → live dashboard update.
 
@@ -1213,11 +1236,11 @@ def explain(centre_id: str, lang: str = "mr", user=Depends(get_current_user)):
 
 - [ ] **Step 1: Add the remaining read routes** to `app/routers/centres.py` (`/beds`, `/attendance?days=`, `/footfall?days=`, `/tests`) — each returns `ok({...})` from the matching subcollection.
 
-- [ ] **Step 2: Generate Centre Detail via Claude Design** — explanation card (from explain endpoint) · stock table with forecast progress bars + severity badges · bed occupancy RadialBarChart · 7-day attendance BarChart · 30-day footfall LineChart (annotate projection/trend from §6.4) · tests grid (✅/❌). **Cuttable:** if time-constrained, ship stock table + one chart only (Global Constraint / spec §7).
+- [x] **Step 2: Generate Centre Detail via Claude Design** — explanation card (from explain endpoint) · stock table with forecast progress bars + severity badges · bed occupancy RadialBarChart · 7-day attendance BarChart · 30-day footfall LineChart (annotate projection/trend from §6.4) · tests grid (✅/❌). **Cuttable:** if time-constrained, ship stock table + one chart only (Global Constraint / spec §7).
 
 - [ ] **Step 3: Verify** — clicking PHC Velhe shows score ~38, flags, charts render from real data.
 
-- [ ] **Step 4: Commit** — `git commit -am "feat: centre detail page + read routes"`
+- [x] **Step 4: Commit** — `git commit -am "feat: centre detail page + read routes"`
 
 ### Task 3.2 (FE): My Centre operator page
 
@@ -1226,11 +1249,11 @@ def explain(centre_id: str, lang: str = "mr", user=Depends(get_current_user)):
 **Interfaces:**
 - Consumes: operator write endpoints (Task 2.5); reads own centre via `useDoc`/`api`.
 
-- [ ] **Step 1: Generate My Centre via Claude Design** — mobile-first, scoped to `user.centre_id`: editable stock rows (number input + Save → `PATCH /stock`), beds occupied input, "log today's footfall" field, attendance (doctors present/total), test-availability toggles. Each Save calls the matching endpoint and shows a success toast.
+- [x] **Step 1: Generate My Centre via Claude Design** — mobile-first, scoped to `user.centre_id`: editable stock rows (number input + Save → `PATCH /stock`), beds occupied input, "log today's footfall" field, attendance (doctors present/total), test-availability toggles. Each Save calls the matching endpoint and shows a success toast.
 
 - [ ] **Step 2: Verify the wow-path** — operator lowers paracetamol to 80 → Save → (in an admin tab) a critical alert appears within ~1s. Confirm operator cannot see other centres.
 
-- [ ] **Step 3: Commit** — `git commit -am "feat: my centre operator data-entry page"`
+- [x] **Step 3: Commit** — `git commit -am "feat: my centre operator data-entry page"`
 
 ### Task 3.3 (FE): i18n EN/HI/MR
 
@@ -1239,13 +1262,13 @@ def explain(centre_id: str, lang: str = "mr", user=Depends(get_current_user)):
 **Interfaces:**
 - Produces: `LanguageProvider`, `useLang() -> {lang, setLang, t}`; `t(key)` resolves from the active language dict; `lang` is passed as `?lang=` to AI endpoints.
 
-- [ ] **Step 1: Write `translations.js`** with ~40 keys × {en, hi, mr} (dashboard, critical, stock_out, days_remaining, redistribute, beds, attendance, footfall, tests, acknowledge, sign_out, not_provisioned, …). Marathi default.
+- [x] **Step 1: Write `translations.js`** with ~40 keys × {en, hi, mr} (dashboard, critical, stock_out, days_remaining, redistribute, beds, attendance, footfall, tests, acknowledge, sign_out, not_provisioned, …). Marathi default.
 
-- [ ] **Step 2: Wrap labels** in `t(key)` across Navbar/StatBar/cards/panels; wire the language toggle; append `?lang=${lang}` to briefing/forecast/redistribution/explain calls.
+- [x] **Step 2: Wrap labels** in `t(key)` across Navbar/StatBar/cards/panels; wire the language toggle; append `?lang=${lang}` to briefing/forecast/redistribution/explain calls.
 
-- [ ] **Step 3: Verify** — toggling MR/HI/EN switches all static labels instantly; AI narratives return in the selected language.
+- [x] **Step 3: Verify** — toggling MR/HI/EN switches all static labels instantly; AI narratives return in the selected language.
 
-- [ ] **Step 4: Commit** — `git commit -am "feat: EN/HI/MR i18n"`
+- [x] **Step 4: Commit** — `git commit -am "feat: EN/HI/MR i18n"`
 
 ### Task 3.4 (Integration): Full end-to-end pass
 
