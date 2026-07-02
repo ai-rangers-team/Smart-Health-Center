@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# Env / secrets
+.env
+*serviceaccount*.json
+*service-account*.json
+
+# OS
+.DS_Store
+.idea/
+.venv/
+.claude/
+tests/__init__.py
+app/__init__.py
+api/.pip
+api/secrets/smart-health-a35ef-firebase-adminsdk-fbsvc-d593d423ac.json

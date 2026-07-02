@@ -1,0 +1,26 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from app.config import settings
+
+limiter = Limiter(key_func=get_remote_address)
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="Smart Health API")
+    app.state.limiter = limiter
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[settings.allowed_origin],
+        allow_methods=["*"], allow_headers=["*"], allow_credentials=True,
+    )
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    return app
+
+
+app = create_app()
