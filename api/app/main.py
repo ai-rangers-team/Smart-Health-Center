@@ -1,5 +1,7 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.config import settings
@@ -19,6 +21,9 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health():
         return {"status": "ok"}
+
+    if os.path.isdir("static"):
+        app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
     return app
 

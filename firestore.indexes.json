@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "alerts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "district_id", "order": "ASCENDING" },
+        { "fieldPath": "resolved", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
