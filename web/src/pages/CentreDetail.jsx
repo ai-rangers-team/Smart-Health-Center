@@ -23,7 +23,7 @@ const ESSENTIAL_TESTS = ["malaria", "tb", "pregnancy", "diabetes", "hiv"];
 export default function CentreDetail() {
   const { centreId } = useParams();
   const { signOut } = useAuth();
-  const { t, lang } = useLang();
+  const { t, lang, local } = useLang();
 
   const centre = useDoc(`centres/${centreId}`);
   const stock = useCollection(`centres/${centreId}/stock`);
@@ -170,7 +170,14 @@ export default function CentreDetail() {
               {stock.map((m) => (
                 <li key={m.id}>
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{m.medicine_name}</p>
+                    <p className="text-sm font-medium">
+                      {m.medicine_name}
+                      {local("meds", m.medicine_name) !== m.medicine_name && (
+                        <span className="ml-2 text-xs text-ink-muted">
+                          {local("meds", m.medicine_name)}
+                        </span>
+                      )}
+                    </p>
                     <span
                       className={`rounded-chip px-2.5 py-0.5 text-xs font-semibold ${
                         m.days_remaining <= 3
@@ -188,7 +195,7 @@ export default function CentreDetail() {
                       <DepletionBar daysRemaining={m.days_remaining ?? 21} />
                     </div>
                     <span className="tabular text-xs text-ink-faint">
-                      {m.current_stock} {m.unit}
+                      {m.current_stock} {local("units", m.unit)}
                     </span>
                   </div>
                 </li>
@@ -235,7 +242,7 @@ export default function CentreDetail() {
                         : "bg-status-critical-soft text-status-critical"
                     }`}
                   >
-                    {ok ? "✓" : "✕"} {name}
+                    {ok ? "✓" : "✕"} {local("tests", name)}
                   </span>
                 );
               })}
