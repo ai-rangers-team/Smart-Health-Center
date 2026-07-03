@@ -8,15 +8,25 @@ so a Gemini hiccup can never break a request.
 from google import genai
 from app.config import settings
 
-_client = genai.Client(api_key=settings.gemini_api_key)
-
 _LANG = {"en": "English", "hi": "Hindi", "mr": "Marathi"}
+
+_client = None
+
+
+def _get_client():
+    # Lazy: constructing genai.Client() validates the API key immediately, which
+    # would crash any import of this module (and therefore app.main) before
+    # GEMINI_API_KEY is configured — e.g. on a fresh checkout or in CI.
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=settings.gemini_api_key)
+    return _client
 
 
 def generate(prompt: str, language: str = "mr") -> str:
     full = f"{prompt}\n\nRespond in {_LANG.get(language, 'English')}. Be concise."
     try:
-        resp = _client.models.generate_content(model=settings.gemini_model, contents=full)
+        resp = _get_client().models.generate_content(model=settings.gemini_model, contents=full)
         return (resp.text or "").strip()
     except Exception:
         return ""
