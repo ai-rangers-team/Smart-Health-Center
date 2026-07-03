@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.config import settings
-from app.routers import ai, alerts
+from app.routers import ai, alerts, operator, seed
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -28,6 +28,8 @@ def create_app() -> FastAPI:
     app.include_router(ai.router)
     app.include_router(ai.recs_router)
     app.include_router(alerts.router)
+    app.include_router(operator.router)
+    app.include_router(seed.router)
 
     if os.path.isdir("static"):
         app.mount("/", StaticFiles(directory="static", html=True), name="static")

@@ -78,15 +78,27 @@ smart-health/
 
 **Parallelization:** Within each phase, tasks are grouped by owner (BE = backend core, AI = forecasting/Gemini, FE = frontend, IN = infra). Tasks in different groups within a phase can run concurrently once their listed dependencies are met.
 
-## Progress Notes (updated July 3)
+## Progress Notes (updated July 3, evening)
 
 Checkboxes reflect ATTESTED work only — a step stays unchecked if it could not
-be verified yet, even when the code is written. Current blockers and deviations:
+be verified yet, even when the code is written. Current state:
 
-- **Unchecked verify steps (0.4/1.6/1.7/1.8/2.7/2.8/3.1/3.2)** are all gated on:
-  (a) Firebase web-app config for `web/.env` (ISHA), (b) service-account creds +
-  `firestore_client.py` lazy-init fix (ISHA), (c) seed + operator endpoints,
-  tasks 1.4/2.1/2.5 (DEVIK).
+- **CREDS LANDED — backend fully built and live-verified.** With the service
+  account at `api/secrets/` (git-ignored): Firestore round-trip OK; full demo
+  district seeded into live Firestore (`python -m scripts.seed [--reset]`);
+  all AI endpoints verified against live Gemini; operator writes + recompute +
+  alert regeneration verified end-to-end (`python -m scripts.live_verify`,
+  18/18 checks incl. 401/403 claim guards and the wow-path: stock 120→80 →
+  fresh critical alert at 2.0 days). Firebase WEB config fetched via the
+  Management API and written to `web/.env` + `.env.example` (the web apiKey is
+  public-by-design). Tasks 1.4/2.1/2.4/2.5 are now DONE (built by AI lane —
+  Devik to review rather than rebuild).
+- **Remaining unchecked verify steps are browser-level only:** Google sign-in
+  popup (0.4/1.7), live `onSnapshot` in the UI (1.8/2.8), two-tab UI wow-path
+  (3.2), plus integration pass 3.4 and Phases 4–5. Backend halves are proven.
+  Team accounts get role claims only AFTER first sign-in — sign in once on the
+  real frontend, then re-run `python -m scripts.seed`. Confirm the Google
+  provider is enabled in Firebase Console → Authentication (ISHA).
 - **Deviation — Tasks 1.5/2.6/3.1 read routes:** the frontend reads centre
   subcollections directly via Firestore `onSnapshot` (real-time for free), so
   the REST read endpoints for stock/beds/attendance/footfall/tests/overview are
@@ -276,7 +288,7 @@ def verify_id_token(token: str) -> dict:
     return auth.verify_id_token(token)
 ```
 
-- [ ] **Step 3: Manual verify** — a throwaway script writes then reads a `/_ping` doc; confirm it round-trips in the Firestore console.
+- [x] **Step 3: Manual verify** — a throwaway script writes then reads a `/_ping` doc; confirm it round-trips in the Firestore console.
 
 - [x] **Step 4: Commit**
 ```bash
@@ -540,7 +552,7 @@ def forecast_footfall(history: list[int]) -> dict:
 - Consumes: `db` (0.3), `settings.seed_enabled`, `require_role` (1.2), `forecast_stockout` (1.3).
 - Produces: `POST /api/seed/district` and `POST /api/seed/reset`; `seed/demo_data.py::seed_district()` and `provision_accounts()`.
 
-- [ ] **Step 1: Write `app/seed/demo_data.py`** (minimal now; expanded in Task 2.1)
+- [x] **Step 1: Write `app/seed/demo_data.py`** (minimal now; expanded in Task 2.1)
 ```python
 from firebase_admin import auth
 from app.firestore_client import db
@@ -577,7 +589,7 @@ def seed_district():
     provision_accounts()
 ```
 
-- [ ] **Step 2: Write `app/routers/seed.py`**
+- [x] **Step 2: Write `app/routers/seed.py`**
 ```python
 from fastapi import APIRouter, Depends, HTTPException
 from app.config import settings
@@ -597,11 +609,11 @@ def seed(_=Depends(_guard), user=Depends(require_role("district_admin"))):
     return ok({"seeded": True})
 ```
 
-- [ ] **Step 3: Mount in `main.py`** — `from app.routers import seed` then `app.include_router(seed.router)` inside `create_app`.
+- [x] **Step 3: Mount in `main.py`** — `from app.routers import seed` then `app.include_router(seed.router)` inside `create_app`.
 
-- [ ] **Step 4: Verify** — set `SEED_ENABLED=true`, sign in as the admin account (claim it first — see Task 1.5 Step 4), `curl -X POST localhost:8000/api/seed/district -H "Authorization: Bearer <admin_token>"` → `{"success": true, ...}`; confirm the docs in Firestore console.
+- [x] **Step 4: Verify** — set `SEED_ENABLED=true`, sign in as the admin account (claim it first — see Task 1.5 Step 4), `curl -X POST localhost:8000/api/seed/district -H "Authorization: Bearer <admin_token>"` → `{"success": true, ...}`; confirm the docs in Firestore console.
 
-- [ ] **Step 5: Commit** — `git commit -am "feat: minimal seed + gated seed router"`
+- [x] **Step 5: Commit** — `git commit -am "feat: minimal seed + gated seed router"`
 
 ### Task 1.5 (BE): Read endpoints — centre stock (TDD via TestClient)
 
@@ -681,7 +693,7 @@ def forecast(centre_id: str, lang: str = Query("mr"), user=Depends(get_current_u
     return ok({"medicines": meds, "narrative": narrative})
 ```
 
-- [ ] **Step 2: Mount router. Manual verify** — `curl .../api/ai/forecast/phc_mulshi?lang=en` returns medicines + a non-empty narrative sentence.
+- [x] **Step 2: Mount router. Manual verify** — `curl .../api/ai/forecast/phc_mulshi?lang=en` returns medicines + a non-empty narrative sentence.
 
 - [x] **Step 3: Commit** — `git commit -am "feat: AI forecast endpoint with gemini narrative"`
 
@@ -806,7 +818,7 @@ export function useDoc(path) {
 **Interfaces:**
 - Produces: `seed_district()` writing all 6 centres per the spec scenario, each with stock (with `consumption_history`), beds, `/attendance/{YYYYMMDD}` and `/footfall/{YYYYMMDD}` for the last 30 days, and `/tests` (+`essential`).
 
-- [ ] **Step 1: Replace `seed_district()`** with the full generator. Encode the spec scenario exactly:
+- [x] **Step 1: Replace `seed_district()`** with the full generator. Encode the spec scenario exactly:
   - PHC Mulshi: Paracetamol 120 stock / avg ~40 → ~3 days (critical); attendance ~60%.
   - PHC Haveli: ORS Sachets 90 / avg ~45 → ~2 days (critical).
   - PHC Ambegaon: Iron+Folic 450 / avg ~90 → ~5 days (warning).
@@ -823,9 +835,9 @@ def _days(n):
 # (write consumption_history as the last ~7 daily consumption values per medicine)
 ```
 
-- [ ] **Step 2: Verify** — reseed; Firestore console shows 6 centres each with populated subcollections; footfall/attendance have 30 docs.
+- [x] **Step 2: Verify** — reseed; Firestore console shows 6 centres each with populated subcollections; footfall/attendance have 30 docs.
 
-- [ ] **Step 3: Commit** — `git commit -am "feat: full Pune Rural District demo seed"`
+- [x] **Step 3: Commit** — `git commit -am "feat: full Pune Rural District demo seed"`
 
 ### Task 2.2 (AI): Underperformance scoring (TDD)
 
@@ -942,7 +954,7 @@ def compute_redistribution(centres: list[dict]) -> list[dict]:
 **Interfaces:**
 - Produces: `build_alerts(centre_id, centre_name, district_id, stock_forecasts, beds, attendance_rate, tests) -> list[dict]` returning alert docs with `type, severity, message, medicine_name, days_remaining, resolved=False`. No Gemini.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 ```python
 from app.services.alerting import build_alerts
 
@@ -960,9 +972,9 @@ def test_bed_crisis_and_test_unavailable():
     assert "BED_CRISIS" in types and "TEST_UNAVAILABLE" in types
 ```
 
-- [ ] **Step 2: Run, expect FAIL.**
+- [x] **Step 2: Run, expect FAIL.**
 
-- [ ] **Step 3: Write `app/services/alerting.py`**
+- [x] **Step 3: Write `app/services/alerting.py`**
 ```python
 ESSENTIAL = ("malaria", "tb", "pregnancy")
 
@@ -990,7 +1002,7 @@ def build_alerts(centre_id, centre_name, district_id, stock_forecasts, beds, att
     return alerts
 ```
 
-- [ ] **Step 4: Run, expect PASS. Commit** — `git commit -am "feat: template-based alert generation"`
+- [x] **Step 4: Run, expect PASS. Commit** — `git commit -am "feat: template-based alert generation"`
 
 ### Task 2.5 (BE): Recompute-on-write + operator write endpoints
 
@@ -1000,7 +1012,7 @@ def build_alerts(centre_id, centre_name, district_id, stock_forecasts, beds, att
 - Consumes: `forecast_stockout`, `compute_performance_score`, `build_alerts`, `db`, `require_own_centre`.
 - Produces: `recompute_centre(centre_id)` (writes back `days_remaining`/`predicted_stockout_date` per medicine, `performance_score`, `status`, replaces that centre's active alerts). Endpoints: `PATCH /api/centres/{id}/stock`, `/beds`, `POST /api/centres/{id}/footfall`, `/attendance`, `PATCH /api/centres/{id}/tests`.
 
-- [ ] **Step 1: Write `app/services/recompute.py`**
+- [x] **Step 1: Write `app/services/recompute.py`**
 ```python
 from firebase_admin import firestore
 from app.firestore_client import db
@@ -1043,7 +1055,7 @@ def recompute_centre(centre_id: str):
     return score
 ```
 
-- [ ] **Step 2: Write `app/routers/operator.py`**
+- [x] **Step 2: Write `app/routers/operator.py`**
 ```python
 from fastapi import APIRouter, Depends
 from app.deps import get_current_user, require_own_centre
@@ -1095,9 +1107,9 @@ def update_tests(centre_id: str, body: TestsUpdate, user=Depends(get_current_use
 ```
   *(Adjust beds/tests to live under a `current` doc; update seed in Task 2.1 to write `beds/current` and `tests/current` accordingly.)*
 
-- [ ] **Step 3: Mount router. Manual verify** — as a `phc_operator` for Mulshi, `PATCH .../phc_mulshi/stock {"medicine_id":"paracetamol","current_stock":80}` → recompute returns a score; a new `STOCKOUT_CRITICAL` alert appears in `/alerts`; a cross-centre write (different centre_id) returns 403.
+- [x] **Step 3: Mount router. Manual verify** — as a `phc_operator` for Mulshi, `PATCH .../phc_mulshi/stock {"medicine_id":"paracetamol","current_stock":80}` → recompute returns a score; a new `STOCKOUT_CRITICAL` alert appears in `/alerts`; a cross-centre write (different centre_id) returns 403.
 
-- [ ] **Step 4: Commit** — `git commit -am "feat: operator write endpoints + recompute-on-write"`
+- [x] **Step 4: Commit** — `git commit -am "feat: operator write endpoints + recompute-on-write"`
 
 ### Task 2.6 (BE): District overview + alerts endpoints
 
@@ -1202,7 +1214,7 @@ def explain(centre_id: str, lang: str = "mr", user=Depends(get_current_user)):
     return ok({"score": score, "explanation": text})
 ```
 
-- [ ] **Step 4: Verify** all three via curl; confirm `/recommendations` docs appear and briefing caches (second call returns `cached:true`).
+- [x] **Step 4: Verify** all three via curl; confirm `/recommendations` docs appear and briefing caches (second call returns `cached:true`).
 
 - [x] **Step 5: Commit** — `git commit -am "feat: briefing (cached), redistribution, explain endpoints"`
 
