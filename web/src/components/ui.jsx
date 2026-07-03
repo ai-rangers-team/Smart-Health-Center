@@ -99,12 +99,12 @@ const STATUS_STYLES = {
   low: "bg-status-healthy-soft text-status-healthy-deep",
 };
 
-export function StatusBadge({ status, children }) {
+export function StatusBadge({ status, children, className = "" }) {
   return (
     <span
-      className={`inline-flex items-center rounded-chip px-3 py-1 text-xs font-semibold ${
+      className={`inline-flex items-center whitespace-nowrap rounded-chip px-3 py-1 text-xs font-semibold ${
         STATUS_STYLES[status] || STATUS_STYLES.healthy
-      }`}
+      } ${className}`}
     >
       {children}
     </span>
