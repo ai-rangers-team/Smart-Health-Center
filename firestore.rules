@@ -17,5 +17,6 @@ service cloud.firestore {
     match /alerts/{a} { allow read: if signedIn(); allow write: if false; }        // backend-only via admin SDK
     match /recommendations/{r} { allow read: if signedIn(); allow write: if false; }
     match /users/{u} { allow read: if signedIn() && request.auth.uid == u; allow write: if false; }
+    match /roles/{email} { allow read, write: if false; }                     // backend-only via admin SDK
   }
 }

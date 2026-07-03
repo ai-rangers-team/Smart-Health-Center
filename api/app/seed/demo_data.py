@@ -14,12 +14,13 @@ from app.services.recompute import recompute_centre
 DISTRICT = {"id": "pune_rural", "name": "Pune Rural District", "state": "Maharashtra"}
 DISTRICT_AVG_FOOTFALL = 78
 
-# email -> (role, centre_id). Accounts must have signed in once before claims
-# can attach; provision_accounts() skips (and reports) the ones that haven't.
-DEMO_ACCOUNTS = {
+# Fallback seed for the `roles` Firestore collection (doc id = email) the first
+# time it's empty. After that, the collection is the source of truth — edit
+# roles via set_role()/Firestore console, not by changing this dict.
+DEFAULT_ROLES = {
     "rishimishra1508@gmail.com": ("district_admin", None),
     "rupeshsharma137@gmail.com": ("district_admin", None),
-    "ishadesai53@gmail.com": ("phc_operator", "phc_mulshi"),
+    "ishadesai53@gmail.com": ("district_admin", None),
     "devikbansal14@gmail.com": ("phc_operator", "phc_haveli"),
 }
 
@@ -197,10 +198,33 @@ def seed_district():
     return results
 
 
+def _roles_collection():
+    return _db().collection("roles")
+
+
+def _load_roles() -> dict:
+    """Read email -> (role, centre_id) from Firestore, seeding DEFAULT_ROLES
+    into it the first time the collection is empty."""
+    docs = list(_roles_collection().stream())
+    if not docs:
+        for email, (role, centre_id) in DEFAULT_ROLES.items():
+            set_role(email, role, centre_id)
+        docs = list(_roles_collection().stream())
+    return {d.id: (d.to_dict()["role"], d.to_dict().get("centre_id")) for d in docs}
+
+
+def set_role(email: str, role: str, centre_id: str | None = None):
+    """Add/update a role assignment. This is the DB-backed replacement for
+    editing DEFAULT_ROLES in code — call this (or edit the `roles` collection
+    in the Firestore console) instead of changing this file."""
+    _roles_collection().document(email).set({"role": role, "centre_id": centre_id})
+
+
 def provision_accounts():
-    """Attach role custom-claims to demo accounts that exist in Firebase Auth."""
+    """Attach role custom-claims to accounts (from the `roles` Firestore
+    collection) that exist in Firebase Auth."""
     done, skipped = [], []
-    for email, (role, centre_id) in DEMO_ACCOUNTS.items():
+    for email, (role, centre_id) in _load_roles().items():
         try:
             u = auth.get_user_by_email(email)
             auth.set_custom_user_claims(u.uid, {
