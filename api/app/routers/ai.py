@@ -3,10 +3,6 @@
 Thin glue: read Firestore -> run the decision-layer services (forecasting, scoring,
 redistribution) -> enrich with Gemini -> return the standard envelope. Gemini never
 gates a write here; these are read/advisory endpoints.
-
-STATUS: built per the plan but UNVERIFIED end-to-end — requires the firestore_client
-eager-init fix + service-account creds for smart-health-a35ef + seeded data. The
-pure services it calls (forecasting/scoring/redistribution/gemini) are unit-tested.
 """
 import time
 
@@ -17,12 +13,10 @@ from app.deps import get_current_user
 from app.models.schemas import ok
 from app.services import gemini
 from app.services.forecasting import forecast_stockout
+from app.services.recompute import recompute_centre
 from app.services.redistribution import compute_redistribution
-from app.services.scoring import compute_performance_score
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
-
-ESSENTIAL_TESTS = ("malaria", "tb", "pregnancy")
 
 # district_id -> (briefing_text, expires_at_epoch, critical_count_at_generation)
 _briefing_cache: dict[str, tuple[str, float, int]] = {}
@@ -43,22 +37,6 @@ def _stock_forecasts(centre_id: str) -> list[dict]:
         fc = forecast_stockout(m.get("consumption_history", []), m.get("current_stock", 0))
         out.append({"medicine_name": m.get("medicine_name"), "id": doc.id, **m, **fc})
     return out
-
-
-def _mean(values: list[float]) -> float:
-    return sum(values) / len(values) if values else 0.0
-
-
-def _recent_attendance_rate(centre_id: str, days: int = 7) -> float:
-    docs = (_db().collection("centres").document(centre_id).collection("attendance")
-            .order_by("date", direction=firestore.Query.DESCENDING).limit(days).stream())
-    return _mean([d.to_dict().get("attendance_rate", 0.0) for d in docs])
-
-
-def _recent_footfall(centre_id: str, days: int = 30) -> float:
-    docs = (_db().collection("centres").document(centre_id).collection("footfall")
-            .order_by("date", direction=firestore.Query.DESCENDING).limit(days).stream())
-    return _mean([d.to_dict().get("count", 0) for d in docs])
 
 
 @router.get("/forecast/{centre_id}")
@@ -129,22 +107,6 @@ def acknowledge_recommendation(recommendation_id: str, user=Depends(get_current_
 
 @router.post("/explain-underperformance/{centre_id}")
 def explain_underperformance(centre_id: str, lang: str = Query("mr"), user=Depends(get_current_user)):
-    db = _db()
-    centre = (db.collection("centres").document(centre_id).get().to_dict()) or {}
-    beds = (db.collection("centres").document(centre_id).collection("beds")
-            .document("current").get().to_dict()) or {}
-    tests = (db.collection("centres").document(centre_id).collection("tests")
-             .document("current").get().to_dict()) or {}
-    forecasts = _stock_forecasts(centre_id)
-
-    metrics = {
-        "avg_attendance_rate": _recent_attendance_rate(centre_id),
-        "avg_footfall": _recent_footfall(centre_id),
-        "district_avg_footfall": centre.get("district_avg_footfall") or 1,
-        "critical_stockouts": sum(1 for f in forecasts if f["severity"] == "critical"),
-        "bed_occupancy_rate": (beds.get("occupied", 0) / beds["total"]) if beds.get("total") else 0.5,
-        "essential_tests_unavailable": sum(1 for t in ESSENTIAL_TESTS if tests.get(t) is False),
-    }
-    score = compute_performance_score(metrics)
+    score = recompute_centre(centre_id)
     explanation = gemini.underperformance_explanation(score["score"], score["flags"], lang)
     return ok({"score": score, "explanation": explanation})

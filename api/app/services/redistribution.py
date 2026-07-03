@@ -27,9 +27,12 @@ def compute_redistribution(centres: list[dict]) -> list[dict]:
         )
 
         for needy in deficit:
-            if not surplus:
-                break
-            donor = surplus[0]
+            # A centre can be both surplus (ample raw quantity) and deficit (short
+            # runway due to high consumption) for the same medicine — never match
+            # it to itself.
+            donor = next((c for c in surplus if c["id"] != needy["id"]), None)
+            if donor is None:
+                continue
             nd = needy["stock"][med]
             dd = donor["stock"][med]
             need = (_TARGET_DAYS - nd["days_remaining"]) * nd["daily_avg"]
@@ -46,6 +49,6 @@ def compute_redistribution(centres: list[dict]) -> list[dict]:
             })
             dd["current_stock"] -= qty
             if dd["current_stock"] <= dd["reorder_level"] * _SURPLUS_BUFFER:
-                surplus.pop(0)
+                surplus.remove(donor)
 
     return recs

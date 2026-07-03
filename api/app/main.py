@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.config import settings
-from app.routers import ai, alerts, operator, seed
+from app.routers import ai, alerts, centres, dashboard, operator, seed
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -25,10 +25,12 @@ def create_app() -> FastAPI:
 
     # API routers MUST be registered before the catch-all static mount below,
     # otherwise StaticFiles at "/" shadows every /api/* route and returns 404.
+    app.include_router(centres.router)
+    app.include_router(operator.router)
+    app.include_router(dashboard.router)
+    app.include_router(alerts.router)
     app.include_router(ai.router)
     app.include_router(ai.recs_router)
-    app.include_router(alerts.router)
-    app.include_router(operator.router)
     app.include_router(seed.router)
 
     if os.path.isdir("static"):
