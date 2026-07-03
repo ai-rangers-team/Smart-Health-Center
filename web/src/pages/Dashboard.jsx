@@ -160,7 +160,10 @@ export default function Dashboard() {
                   className="flex flex-col gap-2 py-3.5 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-start gap-3">
-                    <StatusBadge status={a.severity}>
+                    <StatusBadge
+                      status={a.severity}
+                      className="mt-0.5 min-w-[5.5rem] shrink-0 justify-center"
+                    >
                       {a.severity === "critical" ? t("critical") : t("warning")}
                     </StatusBadge>
                     <div>
@@ -189,11 +192,14 @@ export default function Dashboard() {
                   key={r.id}
                   className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={r.urgency === "critical" ? "critical" : "warning"}>
+                  <div className="flex items-start gap-3">
+                    <StatusBadge
+                      status={r.urgency === "critical" ? "critical" : "warning"}
+                      className="mt-0.5 min-w-[5.5rem] shrink-0 justify-center"
+                    >
                       {r.urgency === "critical" ? t("critical") : t("warning")}
                     </StatusBadge>
-                    <p className="text-sm">
+                    <p className="text-sm leading-relaxed">
                       {t("reco_move", {
                         qty: r.quantity,
                         medicine: local("meds", r.medicine),
@@ -287,7 +293,7 @@ function CentreCard({ centre, alerts }) {
         EDGE[s] || EDGE.healthy
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-base font-semibold">{centre.name}</h3>
           <p className="text-xs text-ink-muted">{centre.location?.block || centre.type}</p>
