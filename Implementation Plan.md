@@ -99,11 +99,14 @@ be verified yet, even when the code is written. Current state:
   Team accounts get role claims only AFTER first sign-in — sign in once on the
   real frontend, then re-run `python -m scripts.seed`. Confirm the Google
   provider is enabled in Firebase Console → Authentication (ISHA).
-- **Deviation — Tasks 1.5/2.6/3.1 read routes:** the frontend reads centre
-  subcollections directly via Firestore `onSnapshot` (real-time for free), so
-  the REST read endpoints for stock/beds/attendance/footfall/tests/overview are
-  NOT needed unless we later want non-Firestore clients. Devik: don't build
-  them without checking first.
+- **Read routes (1.5/2.6) now EXIST** (Devik built them before seeing the
+  earlier deviation note; merged July 3). The frontend still reads Firestore
+  directly via `onSnapshot` (real-time) — the REST reads are optional API
+  surface for non-Firestore clients / curl demos. Merge kept the live-verified
+  recompute/operator/seed/alerting; took Devik's PEP 562 lazy firestore_client,
+  lazy gemini client, redistribution self-transfer fix, centres+dashboard
+  routes, expanded tests. Merged suite: 44 tests green, live_verify 18/18
+  re-run post-merge.
 - **Deviation — data contract addition:** centre docs carry denormalized summary
   fields (`footfall_today`, `beds_total`, `beds_occupied`, `beds_available`)
   written by seed + recompute; beds/tests live at `centres/{id}/beds/current`
@@ -623,7 +626,7 @@ def seed(_=Depends(_guard), user=Depends(require_role("district_admin"))):
 - Consumes: `db`, `get_current_user`, `ok`.
 - Produces: `GET /api/centres/{centre_id}/stock` → `ok({medicines: [...]})`; each medicine includes forecast fields merged from `forecast_stockout`.
 
-- [ ] **Step 1: Write failing test** (mock `db` via a fake to avoid live Firestore in unit tests)
+- [x] **Step 1: Write failing test** (mock `db` via a fake to avoid live Firestore in unit tests)
 ```python
 # tests/test_endpoints.py (add)
 def test_stock_requires_auth():
@@ -631,9 +634,9 @@ def test_stock_requires_auth():
     assert r.status_code == 401
 ```
 
-- [ ] **Step 2: Run, expect FAIL** (route missing → 404, so first mount an empty router; the auth-first ordering makes it 401 once implemented).
+- [x] **Step 2: Run, expect FAIL** (route missing → 404, so first mount an empty router; the auth-first ordering makes it 401 once implemented).
 
-- [ ] **Step 3: Write `app/routers/centres.py`**
+- [x] **Step 3: Write `app/routers/centres.py`**
 ```python
 from fastapi import APIRouter, Depends
 from app.deps import get_current_user
@@ -653,11 +656,11 @@ def get_stock(centre_id: str, user=Depends(get_current_user)):
     return ok({"medicines": out})
 ```
 
-- [ ] **Step 4: Mount router; run test, expect PASS (401 without token).**
+- [x] **Step 4: Mount router; run test, expect PASS (401 without token).**
 
 - [ ] **Step 5: Manual claim + verify** — first-time role assignment: after the admin signs in once, run `provision_accounts()` (or re-run seed) so claims attach; then `curl .../stock -H "Authorization: Bearer <token>"` returns the medicine with `days_remaining` and `severity: "critical"`.
 
-- [ ] **Step 6: Commit** — `git commit -am "feat: centre stock read endpoint with forecast"`
+- [x] **Step 6: Commit** — `git commit -am "feat: centre stock read endpoint with forecast"`
 
 ### Task 1.6 (AI): Forecast endpoint + Gemini narrative
 
@@ -1118,7 +1121,7 @@ def update_tests(centre_id: str, body: TestsUpdate, user=Depends(get_current_use
 **Interfaces:**
 - Produces: `GET /api/district/{id}/overview` → `ok({centres:[...], counts:{critical,total}, beds:{total,available}})`; `GET /api/district/{id}/alerts?resolved=false` → `ok({alerts:[...]})`.
 
-- [ ] **Step 1: Write `app/routers/dashboard.py`**
+- [x] **Step 1: Write `app/routers/dashboard.py`**
 ```python
 from fastapi import APIRouter, Depends, Query
 from app.deps import get_current_user
@@ -1146,7 +1149,7 @@ def alerts(district_id: str, resolved: bool = Query(False), user=Depends(get_cur
 
 - [ ] **Step 2: Mount. Verify** — `curl .../api/district/pune_rural/overview` returns 6 centres; `/alerts` returns the active alerts. *(If Firestore errors asking for an index, create it — Task 4.2 formalises this.)*
 
-- [ ] **Step 3: Commit** — `git commit -am "feat: district overview + alerts endpoints"`
+- [x] **Step 3: Commit** — `git commit -am "feat: district overview + alerts endpoints"`
 
 ### Task 2.7 (AI): Remaining AI endpoints — briefing, redistribution, explain
 
