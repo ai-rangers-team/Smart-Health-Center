@@ -13,9 +13,30 @@ function statusKey(c) {
   return (c.status || "operational").toLowerCase();
 }
 
+/** Compose alert text from structured fields so it translates on toggle. */
+function alertText(a, t, local) {
+  const med = local("meds", a.medicine_name);
+  switch (a.type) {
+    case "STOCKOUT_CRITICAL":
+      return t("alert_stockout_critical", { medicine: med, days: a.days_remaining });
+    case "STOCKOUT_WARNING":
+      return t("alert_stockout_warning", { medicine: med, days: a.days_remaining });
+    case "BED_CRISIS":
+      return t("alert_bed_crisis");
+    case "ATTENDANCE_LOW":
+      return t("alert_attendance_low");
+    case "UNDERPERFORMANCE":
+      return t("alert_underperformance");
+    case "TEST_UNAVAILABLE":
+      return t("alert_test_unavailable", { test: local("tests", a.test_name || "") });
+    default:
+      return a.message;
+  }
+}
+
 export default function Dashboard() {
   const { districtId, user, signOut } = useAuth();
-  const { t, lang } = useLang();
+  const { t, lang, local } = useLang();
   const did = districtId || "pune_rural";
 
   const centres = useCollection("centres", [where("district_id", "==", did)]);
@@ -144,7 +165,7 @@ export default function Dashboard() {
                     </StatusBadge>
                     <div>
                       <p className="text-sm font-medium">{a.centre_name}</p>
-                      <p className="text-sm text-ink-muted">{a.message}</p>
+                      <p className="text-sm text-ink-muted">{alertText(a, t, local)}</p>
                     </div>
                   </div>
                   <button
@@ -173,8 +194,12 @@ export default function Dashboard() {
                       {r.urgency === "critical" ? t("critical") : t("warning")}
                     </StatusBadge>
                     <p className="text-sm">
-                      {r.gemini_message ||
-                        `${r.quantity} ${r.medicine}: ${r.from_centre} → ${r.to_centre}`}
+                      {t("reco_move", {
+                        qty: r.quantity,
+                        medicine: local("meds", r.medicine),
+                        from: r.from_centre,
+                        to: r.to_centre,
+                      })}
                     </p>
                   </div>
                   <button
@@ -241,7 +266,7 @@ const EDGE = {
 };
 
 function CentreCard({ centre, alerts }) {
-  const { t } = useLang();
+  const { t, local } = useLang();
   const s = statusKey(centre);
   const topAlert = alerts.find(
     (a) => a.centre_id === centre.id && a.days_remaining != null
@@ -292,7 +317,7 @@ function CentreCard({ centre, alerts }) {
                 : "text-status-warning-deep"
             }`}
           >
-            {topAlert.medicine_name} — {topAlert.days_remaining} {t("days_left")}
+            {local("meds", topAlert.medicine_name)} — {topAlert.days_remaining} {t("days_left")}
           </p>
           <div className="mt-1.5">
             <DepletionBar daysRemaining={topAlert.days_remaining} />

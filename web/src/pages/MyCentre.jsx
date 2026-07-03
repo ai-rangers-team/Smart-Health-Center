@@ -15,7 +15,7 @@ const TESTS = ["malaria", "tb", "pregnancy", "diabetes", "hiv"];
  */
 export default function MyCentre() {
   const { centreId, signOut } = useAuth();
-  const { t, lang } = useLang();
+  const { t, lang, local } = useLang();
   const online = useOnline();
 
   const centre = useDoc(`centres/${centreId}`);
@@ -195,7 +195,7 @@ export default function MyCentre() {
               <ul className="mt-4 space-y-3">
                 {TESTS.map((name) => (
                   <li key={name} className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium capitalize">{name}</p>
+                    <p className="text-sm font-medium capitalize">{local("tests", name)}</p>
                     <Choice2
                       value={tests[name]}
                       onChange={(v) => setTests((tt) => ({ ...tt, [name]: v }))}
@@ -220,8 +220,15 @@ export default function MyCentre() {
                   className="border-b border-line-light pb-4 last:border-0 last:pb-0"
                 >
                   <div className="flex items-baseline justify-between">
-                    <p className="font-medium">{m.medicine_name}</p>
-                    <p className="text-xs text-ink-faint">{m.unit}</p>
+                    <p className="font-medium">
+                      {m.medicine_name}
+                      {local("meds", m.medicine_name) !== m.medicine_name && (
+                        <span className="ml-2 text-xs font-normal text-ink-muted">
+                          {local("meds", m.medicine_name)}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-ink-faint">{local("units", m.unit)}</p>
                   </div>
                   <div className="mt-2 flex justify-center">
                     <Stepper

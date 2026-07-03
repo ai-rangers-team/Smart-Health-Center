@@ -79,6 +79,13 @@ export const translations = {
     doctors_present_label: "Doctors present today",
     total_doctors_label: "Total doctors",
     report_includes: "Report includes",
+    alert_stockout_critical: "{medicine} will stock out in {days} days — reorder now",
+    alert_stockout_warning: "{medicine} low: {days} days remaining",
+    alert_bed_crisis: "No beds available",
+    alert_attendance_low: "Doctor attendance below 60%",
+    alert_underperformance: "Flagged for low performance",
+    alert_test_unavailable: "Essential test unavailable: {test}",
+    reco_move: "Move {qty} × {medicine} from {from} to {to}",
   },
   hi: {
     app_name: "Smart Health Centre",
@@ -152,6 +159,13 @@ export const translations = {
     doctors_present_label: "आज उपस्थित डॉक्टर",
     total_doctors_label: "कुल डॉक्टर",
     report_includes: "रिपोर्ट में शामिल",
+    alert_stockout_critical: "{medicine} {days} दिन में समाप्त हो जाएगी — तुरंत ऑर्डर करें",
+    alert_stockout_warning: "{medicine} कम है: {days} दिन शेष",
+    alert_bed_crisis: "कोई बिस्तर उपलब्ध नहीं",
+    alert_attendance_low: "डॉक्टर उपस्थिति 60% से कम",
+    alert_underperformance: "कम प्रदर्शन के लिए चिह्नित",
+    alert_test_unavailable: "आवश्यक जाँच उपलब्ध नहीं: {test}",
+    reco_move: "{from} से {to} को {qty} × {medicine} भेजें",
   },
   mr: {
     app_name: "Smart Health Centre",
@@ -225,6 +239,13 @@ export const translations = {
     doctors_present_label: "आज उपस्थित डॉक्टर",
     total_doctors_label: "एकूण डॉक्टर",
     report_includes: "अहवालात समाविष्ट",
+    alert_stockout_critical: "{medicine} {days} दिवसांत संपेल — त्वरित मागणी करा",
+    alert_stockout_warning: "{medicine} कमी आहे: {days} दिवस शिल्लक",
+    alert_bed_crisis: "एकही खाट उपलब्ध नाही",
+    alert_attendance_low: "डॉक्टर उपस्थिती 60% पेक्षा कमी",
+    alert_underperformance: "कमी कामगिरीसाठी चिन्हांकित",
+    alert_test_unavailable: "आवश्यक तपासणी उपलब्ध नाही: {test}",
+    reco_move: "{from} कडून {to} ला {qty} × {medicine} पाठवा",
   },
 };
 
@@ -241,13 +262,48 @@ export function LanguageProvider({ children }) {
     localStorage.setItem("lang", l);
     setLang(l);
   };
-  const t = (key) => translations[lang]?.[key] ?? translations.en[key] ?? key;
+  // t(key, vars): "{x}" placeholders interpolate from vars
+  const t = (key, vars) => {
+    let s = translations[lang]?.[key] ?? translations.en[key] ?? key;
+    if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
+    return s;
+  };
+  // local("meds"|"units"|"tests", value): localized data vocabulary, falls back to value
+  const local = (kind, value) =>
+    (value && vocabulary[lang]?.[kind]?.[String(value).toLowerCase()]) || value;
   return createElement(
     LanguageContext.Provider,
-    { value: { lang, setLang: set, t } },
+    { value: { lang, setLang: set, t, local } },
     children
   );
 }
+
+/** Data vocabulary: medicine names, units, tests. English falls through as-is. */
+export const vocabulary = {
+  en: { meds: {}, units: {}, tests: { tb: "TB", hiv: "HIV" } },
+  hi: {
+    meds: {
+      "paracetamol 500mg": "पैरासिटामोल 500",
+      "ors sachets": "ओआरएस पाउच",
+      "iron + folic acid": "आयरन + फोलिक एसिड",
+      "amoxicillin 250mg": "एमोक्सिसिलिन 250",
+      "metformin 500mg": "मेटफॉर्मिन 500",
+    },
+    units: { tablets: "गोलियाँ", sachets: "पाउच", vials: "शीशियाँ" },
+    tests: { malaria: "मलेरिया", tb: "टीबी", pregnancy: "गर्भावस्था जाँच", diabetes: "मधुमेह", hiv: "एचआईवी" },
+  },
+  mr: {
+    meds: {
+      "paracetamol 500mg": "पॅरासिटामॉल 500",
+      "ors sachets": "ओआरएस पाकिटे",
+      "iron + folic acid": "लोह + फॉलिक आम्ल",
+      "amoxicillin 250mg": "अमोक्सिसिलिन 250",
+      "metformin 500mg": "मेटफॉर्मिन 500",
+    },
+    units: { tablets: "गोळ्या", sachets: "पाकिटे", vials: "कुप्या" },
+    tests: { malaria: "मलेरिया", tb: "टीबी", pregnancy: "गर्भधारणा तपासणी", diabetes: "मधुमेह", hiv: "एचआयव्ही" },
+  },
+};
 
 export function useLang() {
   return useContext(LanguageContext);
