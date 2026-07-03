@@ -335,7 +335,7 @@ export const db = initializeFirestore(app, { localCache: persistentLocalCache() 
 
 - [x] **Step 4: Temporary sign-in button in `App.jsx`** calling `signInWithPopup(auth, googleProvider)` then `user.getIdToken().then(console.log)`.
 
-- [ ] **Step 5: Verify** — `npm run dev`, click sign-in, confirm a Google account signs in and an ID token prints. (Add `localhost` is already an authorized domain by default.)
+- [x] **Step 5: Verify** — `npm run dev`, click sign-in, confirm a Google account signs in and an ID token prints. (Add `localhost` is already an authorized domain by default.)
 
 - [x] **Step 6: Commit**
 ```bash
@@ -771,7 +771,7 @@ export default function App() {
 
 - [x] **Step 4: Write `Login.jsx` and `NotProvisioned.jsx`** — Login: product title + "Sign in with Google" button calling `onSignIn`. NotProvisioned: "Account not yet provisioned — contact your district admin" + email + sign-out. (Visual polish via Claude Design later; functional now.)
 
-- [ ] **Step 5: Verify** — sign in with an account that has NO claim → NotProvisioned screen. Provision it (seed), refresh → routes to the correct role stub.
+- [x] **Step 5: Verify** — sign in with an account that has NO claim → NotProvisioned screen. Provision it (seed), refresh → routes to the correct role stub.
 
 - [x] **Step 6: Commit** — `git commit -am "feat: login, role routing, not-provisioned, useAuth + api client"`
 
@@ -1232,7 +1232,7 @@ def explain(centre_id: str, lang: str = "mr", user=Depends(get_current_user)):
 
 - [x] **Step 2: Wire real-time** — CentreGrid + AlertsPanel bind to `useCollection` so an operator write updates them live. Clicking a centre routes to `/centre/:id` (Task 3.1).
 
-- [ ] **Step 3: Verify** — as admin, the dashboard shows 6 centres with correct colours, ~4 active alerts, a briefing sentence, and (after POST redistribution) recommendation cards. In a second tab as Mulshi operator, change stock → admin dashboard updates live.
+- [x] **Step 3: Verify** — as admin, the dashboard shows 6 centres with correct colours, ~4 active alerts, a briefing sentence, and (after POST redistribution) recommendation cards. In a second tab as Mulshi operator, change stock → admin dashboard updates live.
 
 - [x] **Step 4: Commit** — `git commit -am "feat: district admin dashboard (live)"`
 
