@@ -15,7 +15,7 @@ const TESTS = ["malaria", "tb", "pregnancy", "diabetes", "hiv"];
  */
 export default function MyCentre() {
   const { centreId, signOut } = useAuth();
-  const { t, lang, local } = useLang();
+  const { t, lang, local, hasChosenLang, setLang } = useLang();
   const online = useOnline();
 
   const centre = useDoc(`centres/${centreId}`);
@@ -23,8 +23,15 @@ export default function MyCentre() {
   const bedsDoc = useDoc(`centres/${centreId}/beds/current`);
   const testsDoc = useDoc(`centres/${centreId}/tests/current`);
 
+  // One-time regional default: only applies if the operator hasn't already
+  // chosen a language, and never re-fires once they have.
+  useEffect(() => {
+    if (!hasChosenLang && centre?.default_language) setLang(centre.default_language);
+  }, [hasChosenLang, centre?.default_language]);
+
   const [patients, setPatients] = useState(0);
   const [bedsOccupied, setBedsOccupied] = useState(0);
+  const [bedsTotal, setBedsTotal] = useState(0);
   const [docsPresent, setDocsPresent] = useState(0);
   const [docsTotal, setDocsTotal] = useState(2);
   const [stock, setStock] = useState({});
@@ -34,7 +41,10 @@ export default function MyCentre() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (bedsDoc) setBedsOccupied(bedsDoc.occupied || 0);
+    if (bedsDoc) {
+      setBedsOccupied(bedsDoc.occupied || 0);
+      setBedsTotal(bedsDoc.total || 0);
+    }
   }, [bedsDoc]);
   useEffect(() => {
     if (testsDoc)
@@ -58,7 +68,10 @@ export default function MyCentre() {
           });
         }
       }
-      await api.patch(`/api/centres/${centreId}/beds`, { occupied: bedsOccupied });
+      await api.patch(`/api/centres/${centreId}/beds`, {
+        occupied: bedsOccupied,
+        total: bedsTotal,
+      });
       await api.post(`/api/centres/${centreId}/footfall`, { count: patients });
       await api.post(`/api/centres/${centreId}/attendance`, {
         doctors_present: docsPresent,
@@ -71,7 +84,7 @@ export default function MyCentre() {
         docsPresent,
         docsTotal,
         bedsOccupied,
-        bedsTotal: bedsDoc?.total,
+        bedsTotal,
       });
     } catch (e) {
       setError(
@@ -169,10 +182,14 @@ export default function MyCentre() {
             <section className="rounded-card border border-line bg-surface p-5">
               <h2 className="font-semibold">{t("beds_section")}</h2>
               <p className="text-sm text-ink-muted">
-                {bedsOccupied} {t("of")} {bedsDoc?.total ?? "—"}
+                {bedsOccupied} {t("of")} {bedsTotal}
               </p>
               <div className="mt-4 flex justify-center">
                 <Stepper value={bedsOccupied} onChange={setBedsOccupied} />
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line-light pt-3">
+                <p className="text-sm text-ink-muted">{t("total_beds_label")}</p>
+                <Stepper value={bedsTotal} onChange={setBedsTotal} />
               </div>
             </section>
 
