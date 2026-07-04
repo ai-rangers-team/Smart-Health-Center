@@ -48,7 +48,8 @@ def update_beds(centre_id: str, body: BedsUpdate, user=Depends(get_current_user)
     require_own_centre(centre_id, user)
     ref = (_db().collection("centres").document(centre_id)
            .collection("beds").document("current"))
-    total = (ref.get().to_dict() or {}).get("total", 0)
+    stored_total = (ref.get().to_dict() or {}).get("total", 0)
+    total = body.total if body.total is not None else stored_total
     ref.set({"total": total, "occupied": body.occupied,
              "available": max(0, total - body.occupied)}, merge=True)
     return ok({"recomputed": recompute_centre(centre_id)})

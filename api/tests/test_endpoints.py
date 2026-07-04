@@ -51,3 +51,24 @@ def test_alert_resolve_requires_auth():
 def test_seed_disabled_by_default():
     r = client.post("/api/seed/district")
     assert r.status_code == 403
+
+
+_CENTRE_CREATE_BODY = {"name": "PHC Test", "type": "PHC", "block": "Test Block"}
+
+
+def test_create_centre_requires_auth():
+    r = client.post("/api/centres", json=_CENTRE_CREATE_BODY)
+    assert r.status_code == 401
+
+
+def test_create_centre_forbidden_for_non_admin(monkeypatch):
+    from app import firestore_client
+
+    def fake_verify(token):
+        return {"uid": "u1", "email": "op@test.com", "role": "phc_operator",
+                "district_id": "pune_rural", "centre_id": "phc_mulshi"}
+
+    monkeypatch.setattr(firestore_client, "verify_id_token", fake_verify)
+    r = client.post("/api/centres", json=_CENTRE_CREATE_BODY,
+                     headers={"Authorization": "Bearer faketoken"})
+    assert r.status_code == 403

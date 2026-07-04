@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from firebase_admin import auth
 
+from app.services.language import default_language_for_state
 from app.services.recompute import recompute_centre
 
 DISTRICT = {"id": "pune_rural", "name": "Pune Rural District", "state": "Maharashtra"}
@@ -18,12 +19,12 @@ DISTRICT_AVG_FOOTFALL = 78
 # can attach; provision_accounts() skips (and reports) the ones that haven't.
 DEMO_ACCOUNTS = {
     "rishimishra1508@gmail.com": ("district_admin", None),
-    "rupeshsharma137@gmail.com": ("district_admin", None),
+    "rupeshsharma137@gmail.com": ("phc_operator", "phc_ambegaon"),
     "ishadesai53@gmail.com": ("phc_operator", "phc_mulshi"),
     "devikbansal14@gmail.com": ("phc_operator", "phc_haveli"),
 }
 
-_MEDS = [
+MEDS = [
     # id, name, unit, reorder_level, min_threshold
     ("paracetamol", "Paracetamol 500mg", "tablets", 200, 100),
     ("ors", "ORS Sachets", "sachets", 100, 50),
@@ -139,6 +140,7 @@ def seed_district():
     db.collection("districts").document(DISTRICT["id"]).set({
         "name": DISTRICT["name"], "state": DISTRICT["state"],
         "total_centres": len(CENTRES),
+        "default_language": default_language_for_state(DISTRICT["state"]),
     })
 
     days30 = _dates(30)
@@ -152,7 +154,7 @@ def seed_district():
             "status": "operational",
         })
 
-        for med_id, name, unit, reorder, minimum in _MEDS:
+        for med_id, name, unit, reorder, minimum in MEDS:
             stock, history = c["stock"][med_id]
             cref.collection("stock").document(med_id).set({
                 "medicine_name": name, "unit": unit,
@@ -197,15 +199,25 @@ def seed_district():
     return results
 
 
+def provision_account(email: str, role: str, district_id: str, centre_id: str | None) -> bool:
+    """Attach role custom-claims to one account. Returns True if provisioned,
+    False if the account has never signed in yet (caller should treat this as
+    a soft skip, not an error)."""
+    try:
+        u = auth.get_user_by_email(email)
+        auth.set_custom_user_claims(u.uid, {
+            "role": role, "district_id": district_id, "centre_id": centre_id})
+        return True
+    except auth.UserNotFoundError:
+        return False
+
+
 def provision_accounts():
     """Attach role custom-claims to demo accounts that exist in Firebase Auth."""
     done, skipped = [], []
     for email, (role, centre_id) in DEMO_ACCOUNTS.items():
-        try:
-            u = auth.get_user_by_email(email)
-            auth.set_custom_user_claims(u.uid, {
-                "role": role, "district_id": DISTRICT["id"], "centre_id": centre_id})
+        if provision_account(email, role, DISTRICT["id"], centre_id):
             done.append(email)
-        except auth.UserNotFoundError:
+        else:
             skipped.append(email)  # must sign in once first, then re-run
     return {"provisioned": done, "skipped_never_signed_in": skipped}
