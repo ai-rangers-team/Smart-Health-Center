@@ -4,8 +4,15 @@ import { db } from "../firebase";
 import { PREVIEW } from "../dev/preview";
 import { previewCollection, previewDoc } from "../dev/fixtures";
 
-/** Live collection via onSnapshot. `constraints` = where()/orderBy()/limit() list. */
-export function useCollection(path, constraints = []) {
+/**
+ * Live collection via onSnapshot. `constraints` = where()/orderBy()/limit() list.
+ * `deps` = the raw values those constraints were built from (e.g. `[districtId]`),
+ * used to detect when the query actually needs to change — Firestore's
+ * QueryConstraint objects don't stringify meaningfully (String(where(...)) is
+ * always "[object Object]"), so re-subscribing can't rely on the constraints
+ * array itself.
+ */
+export function useCollection(path, constraints = [], deps = []) {
   const [rows, setRows] = useState(PREVIEW ? previewCollection(path) : []);
   useEffect(() => {
     if (PREVIEW) return; // fixtures are static in preview mode
@@ -14,7 +21,7 @@ export function useCollection(path, constraints = []) {
       setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, JSON.stringify(constraints.map(String))]);
+  }, [path, ...deps]);
   return rows;
 }
 
