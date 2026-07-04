@@ -5,6 +5,7 @@ import NotProvisioned from "./pages/NotProvisioned";
 import Dashboard from "./pages/Dashboard";
 import CentreDetail from "./pages/CentreDetail";
 import MyCentre from "./pages/MyCentre";
+import OnboardCentre from "./pages/OnboardCentre";
 
 export default function App() {
   const { user, role, loading, signIn, signOut } = useAuth();
@@ -24,6 +25,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/centre/:centreId" element={<CentreDetail />} />
+        <Route path="/onboard-centre" element={<OnboardCentre />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

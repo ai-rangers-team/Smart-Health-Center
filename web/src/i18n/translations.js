@@ -9,7 +9,8 @@ import { createElement } from "react";
 export const translations = {
   en: {
     app_name: "Smart Health Centre",
-    dept_line: "Pune Rural District · Maharashtra Health Dept.",
+    dept_line: "Health Dept.",
+    dept_line_dynamic: "{district} · {state} Health Dept.",
     who_using: "Who is using this device?",
     health_worker: "Health Worker",
     health_worker_desc: "I work at a health centre and send today's report.",
@@ -86,10 +87,22 @@ export const translations = {
     alert_underperformance: "Flagged for low performance",
     alert_test_unavailable: "Essential test unavailable: {test}",
     reco_move: "Move {qty} × {medicine} from {from} to {to}",
+    onboard_centre: "Onboard a centre",
+    centre_name_label: "Centre name",
+    centre_type_label: "Centre type",
+    block_label: "Block / location",
+    operator_email_label: "Operator's email (optional)",
+    operator_email_hint: "They'll get access once they've signed in at least once.",
+    create_centre_button: "Create centre",
+    centre_created_title: "Centre created",
+    operator_provisioned_yes: "Operator access granted.",
+    operator_provisioned_pending: "Operator access will apply once they sign in.",
+    total_beds_label: "Total beds",
   },
   hi: {
     app_name: "Smart Health Centre",
     dept_line: "पुणे ग्रामीण जिला · महाराष्ट्र स्वास्थ्य विभाग",
+    dept_line_dynamic: "{district} · {state} स्वास्थ्य विभाग",
     who_using: "यह उपकरण कौन उपयोग कर रहा है?",
     health_worker: "स्वास्थ्य कर्मचारी",
     health_worker_desc: "मैं स्वास्थ्य केंद्र में काम करता/करती हूँ और आज की रिपोर्ट भेजता/भेजती हूँ।",
@@ -166,10 +179,22 @@ export const translations = {
     alert_underperformance: "कम प्रदर्शन के लिए चिह्नित",
     alert_test_unavailable: "आवश्यक जाँच उपलब्ध नहीं: {test}",
     reco_move: "{from} से {to} को {qty} × {medicine} भेजें",
+    onboard_centre: "नया केंद्र जोड़ें",
+    centre_name_label: "केंद्र का नाम",
+    centre_type_label: "केंद्र प्रकार",
+    block_label: "ब्लॉक / स्थान",
+    operator_email_label: "ऑपरेटर का ईमेल (वैकल्पिक)",
+    operator_email_hint: "एक बार साइन इन करने के बाद उन्हें एक्सेस मिल जाएगा।",
+    create_centre_button: "केंद्र बनाएं",
+    centre_created_title: "केंद्र बन गया",
+    operator_provisioned_yes: "ऑपरेटर एक्सेस दे दिया गया।",
+    operator_provisioned_pending: "साइन इन करने के बाद ऑपरेटर एक्सेस लागू होगा।",
+    total_beds_label: "कुल बिस्तर",
   },
   mr: {
     app_name: "Smart Health Centre",
     dept_line: "पुणे ग्रामीण जिल्हा · महाराष्ट्र आरोग्य विभाग",
+    dept_line_dynamic: "{district} · {state} आरोग्य विभाग",
     who_using: "हे उपकरण कोण वापरत आहे?",
     health_worker: "आरोग्य कर्मचारी",
     health_worker_desc: "मी आरोग्य केंद्रात काम करतो/करते आणि आजचा अहवाल पाठवतो/पाठवते.",
@@ -246,21 +271,38 @@ export const translations = {
     alert_underperformance: "कमी कामगिरीसाठी चिन्हांकित",
     alert_test_unavailable: "आवश्यक तपासणी उपलब्ध नाही: {test}",
     reco_move: "{from} कडून {to} ला {qty} × {medicine} पाठवा",
+    onboard_centre: "नवीन केंद्र जोडा",
+    centre_name_label: "केंद्राचे नाव",
+    centre_type_label: "केंद्र प्रकार",
+    block_label: "ब्लॉक / ठिकाण",
+    operator_email_label: "ऑपरेटरचा ईमेल (ऐच्छिक)",
+    operator_email_hint: "एकदा साइन इन केल्यावर त्यांना प्रवेश मिळेल.",
+    create_centre_button: "केंद्र तयार करा",
+    centre_created_title: "केंद्र तयार झाले",
+    operator_provisioned_yes: "ऑपरेटरला प्रवेश दिला.",
+    operator_provisioned_pending: "साइन इन केल्यावर ऑपरेटर प्रवेश लागू होईल.",
+    total_beds_label: "एकूण खाटा",
   },
 };
 
 const LanguageContext = createContext({
-  lang: "mr",
+  lang: "en",
   setLang: () => {},
   t: (k) => k,
+  hasChosenLang: false,
 });
 
 export function LanguageProvider({ children }) {
-  // Marathi default for the Pune demo (spec §7)
-  const [lang, setLang] = useState(localStorage.getItem("lang") || "mr");
+  // English by default; a centre/district's regional language is applied once
+  // as a starting point (see MyCentre.jsx / Dashboard.jsx) but never overrides
+  // an explicit choice — hasChosenLang tracks whether one has been made yet.
+  const stored = localStorage.getItem("lang");
+  const [lang, setLangState] = useState(stored || "en");
+  const [hasChosenLang, setHasChosenLang] = useState(Boolean(stored));
   const set = (l) => {
     localStorage.setItem("lang", l);
-    setLang(l);
+    setHasChosenLang(true);
+    setLangState(l);
   };
   // t(key, vars): "{x}" placeholders interpolate from vars
   const t = (key, vars) => {
@@ -273,7 +315,7 @@ export function LanguageProvider({ children }) {
     (value && vocabulary[lang]?.[kind]?.[String(value).toLowerCase()]) || value;
   return createElement(
     LanguageContext.Provider,
-    { value: { lang, setLang: set, t, local } },
+    { value: { lang, setLang: set, t, local, hasChosenLang } },
     children
   );
 }
