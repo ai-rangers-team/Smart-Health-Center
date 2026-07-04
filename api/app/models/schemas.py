@@ -4,6 +4,7 @@ NOTE: Created by the AI lane to unblock the AI endpoints. This is BE-owned
 foundation — Devik should reconcile/extend rather than recreate.
 """
 from datetime import datetime, timezone
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -23,6 +24,7 @@ class StockUpdate(BaseModel):
 
 class BedsUpdate(BaseModel):
     occupied: int = Field(ge=0)
+    total: int | None = Field(default=None, ge=0)
 
 
 class FootfallLog(BaseModel):
@@ -40,3 +42,10 @@ class AttendanceLog(BaseModel):
 
 class TestsUpdate(BaseModel):
     tests: dict[str, bool]
+
+
+class CentreCreate(BaseModel):
+    name: str = Field(min_length=1)
+    type: Literal["PHC", "CHC"]
+    block: str = Field(min_length=1)
+    operator_email: str | None = None
