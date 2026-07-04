@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { where } from "firebase/firestore";
 import { api } from "../api";
 import { useAuth } from "../hooks/useAuth";
-import { useCollection } from "../hooks/useFirestore";
+import { useCollection, useDoc } from "../hooks/useFirestore";
 import { useLang } from "../i18n/translations";
 import { DepletionBar, LanguageSwitch, Monogram, StatusBadge } from "../components/ui";
 
@@ -36,17 +36,24 @@ function alertText(a, t, local) {
 
 export default function Dashboard() {
   const { districtId, user, signOut } = useAuth();
-  const { t, lang, local } = useLang();
+  const { t, lang, local, hasChosenLang, setLang } = useLang();
   const did = districtId || "pune_rural";
 
-  const centres = useCollection("centres", [where("district_id", "==", did)]);
+  const district = useDoc(`districts/${did}`);
+  // One-time regional default: only applies if the admin hasn't already
+  // chosen a language, and never re-fires once they have.
+  useEffect(() => {
+    if (!hasChosenLang && district?.default_language) setLang(district.default_language);
+  }, [hasChosenLang, district?.default_language]);
+
+  const centres = useCollection("centres", [where("district_id", "==", did)], [did]);
   const alerts = useCollection("alerts", [
     where("district_id", "==", did),
     where("resolved", "==", false),
-  ]);
+  ], [did]);
   const recommendations = useCollection("recommendations", [
     where("district_id", "==", did),
-  ]);
+  ], [did]);
 
   const [briefing, setBriefing] = useState("");
   useEffect(() => {
@@ -104,7 +111,11 @@ export default function Dashboard() {
               <h1 className="text-lg font-bold text-white">
                 {t("app_name")} · {t("district_view")}
               </h1>
-              <p className="text-sm text-ondark-subtle">{t("dept_line")}</p>
+              <p className="text-sm text-ondark-subtle">
+                {district
+                  ? t("dept_line_dynamic", { district: district.name, state: district.state })
+                  : t("dept_line")}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -113,6 +124,12 @@ export default function Dashboard() {
               <p className="text-sm font-semibold text-white">{user?.displayName}</p>
               <p className="text-xs text-ondark-subtle">{t("district_officer")}</p>
             </div>
+            <Link
+              to="/onboard-centre"
+              className="rounded-headerpill bg-white/10 px-3.5 py-2 text-sm font-medium text-white hover:bg-white/20"
+            >
+              {t("onboard_centre")}
+            </Link>
             <button
               onClick={signOut}
               className="rounded-headerpill bg-white/10 px-3.5 py-2 text-sm font-medium text-white hover:bg-white/20"
