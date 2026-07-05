@@ -58,12 +58,34 @@ export default function Dashboard() {
   const [briefing, setBriefing] = useState("");
   const [briefingLoading, setBriefingLoading] = useState(true);
   useEffect(() => {
+    let cancelled = false;
+    let timer;
+    const fetchBriefing = (attempt) => {
+      api
+        .get(`/api/ai/district-briefing/${did}?lang=${lang}`)
+        .then((d) => {
+          if (cancelled) return;
+          setBriefing(d.briefing);
+          // One delayed retry if the model was briefly rate-limited
+          if (!d.briefing && attempt === 0) {
+            timer = setTimeout(() => fetchBriefing(1), 5000);
+            return;
+          }
+          setBriefingLoading(false);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setBriefing("");
+            setBriefingLoading(false);
+          }
+        });
+    };
     setBriefingLoading(true);
-    api
-      .get(`/api/ai/district-briefing/${did}?lang=${lang}`)
-      .then((d) => setBriefing(d.briefing))
-      .catch(() => setBriefing(""))
-      .finally(() => setBriefingLoading(false));
+    fetchBriefing(0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [did, lang]);
 
   const [acked, setAcked] = useState({});
@@ -315,7 +337,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {sorted.map((c) => (
               <CentreCard key={c.id} centre={c} alerts={alerts} />
             ))}
@@ -372,7 +394,7 @@ function CentreCard({ centre, alerts }) {
   return (
     <Link
       to={`/centre/${centre.id}`}
-      className={`block rounded-card border border-line bg-surface p-5 transition-shadow hover:shadow-md ${
+      className={`flex h-full flex-col rounded-card border border-line bg-surface p-5 transition-shadow hover:shadow-md ${
         EDGE[s] || EDGE.healthy
       }`}
     >
@@ -397,8 +419,8 @@ function CentreCard({ centre, alerts }) {
         </div>
       </div>
 
-      {topAlert && (
-        <div className="mt-4">
+      {topAlert ? (
+        <div className="mt-auto pt-4">
           <p
             className={`text-sm font-medium ${
               topAlert.severity === "critical"
@@ -411,6 +433,11 @@ function CentreCard({ centre, alerts }) {
           <div className="mt-1.5">
             <DepletionBar daysRemaining={topAlert.days_remaining} />
           </div>
+        </div>
+      ) : (
+        <div className="mt-auto pt-4">
+          <p className="text-sm font-medium text-status-healthy-deep">{t("stock_ok")}</p>
+          <div className="mt-1.5 h-1.5 w-full rounded-bar bg-status-healthy-soft" />
         </div>
       )}
     </Link>
