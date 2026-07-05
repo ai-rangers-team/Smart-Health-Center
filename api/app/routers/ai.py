@@ -12,7 +12,7 @@ from firebase_admin import firestore
 from app.deps import get_current_user
 from app.models.schemas import ok
 from app.services import gemini
-from app.services.forecasting import forecast_stockout
+from app.services.forecasting import forecast_footfall, forecast_stockout
 from app.services.recompute import recompute_centre
 from app.services.redistribution import compute_redistribution
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -46,7 +46,15 @@ def forecast(centre_id: str, lang: str = Query("mr"), user=Depends(get_current_u
     at_risk = [{"name": m["medicine_name"], "days_remaining": m["days_remaining"]}
                for m in meds if m["severity"] in ("critical", "high")]
     narrative = gemini.stockout_narrative(at_risk, lang)
-    return ok({"medicines": meds, "narrative": narrative})
+
+    # Patient-demand forecast from the footfall series (spec §6.4) — the
+    # forward-looking number the challenge calls an "AI-driven demand forecast".
+    ff_docs = (_db().collection("centres").document(centre_id).collection("footfall")
+               .order_by("date", direction=firestore.Query.DESCENDING).limit(30).stream())
+    counts = [d.to_dict().get("count", 0) for d in ff_docs][::-1]  # oldest -> newest
+    footfall = forecast_footfall(counts) if counts else {"projection": None, "trend": "stable"}
+
+    return ok({"medicines": meds, "narrative": narrative, "footfall": footfall})
 
 
 @router.get("/district-briefing/{district_id}")
@@ -65,7 +73,8 @@ def district_briefing(district_id: str, lang: str = Query("mr"), user=Depends(ge
 
     text = gemini.district_briefing(
         len(alerts), critical, [a.get("message", "") for a in alerts], lang)
-    _briefing_cache[cache_key] = (text, time.time() + 900, critical)  # 15-min TTL
+    if text:  # never cache a failed (empty) Gemini response — retry next request
+        _briefing_cache[cache_key] = (text, time.time() + 900, critical)  # 15-min TTL
     return ok({"briefing": text, "cached": False})
 
 
@@ -85,6 +94,14 @@ def redistribution(district_id: str, lang: str = Query("mr"), user=Depends(get_c
         centres.append({"id": c.id, "name": c.to_dict().get("name"), "stock": stock})
 
     recs = compute_redistribution(centres)
+
+    # Each generated plan supersedes the previous pending one — without this,
+    # every click of "Generate plan" would stack duplicate recommendations.
+    for old in (db.collection("recommendations")
+                .where(filter=FieldFilter("district_id", "==", district_id))
+                .where(filter=FieldFilter("status", "==", "pending")).stream()):
+        old.reference.delete()
+
     for r in recs:
         r["gemini_message"] = gemini.redistribution_instruction(r, lang)
         db.collection("recommendations").add({

@@ -33,12 +33,20 @@ def update_stock(centre_id: str, body: StockUpdate, user=Depends(get_current_use
     prev = ref.get().to_dict() or {}
     updates = {"current_stock": body.current_stock,
                "last_updated": datetime.now(timezone.utc).isoformat()}
-    # Append today's consumption to the history the forecaster reads
-    # (consumption = stock drawdown since the last report, floored at 0).
+    # Record today's consumption for the forecaster (consumption = stock
+    # drawdown since the last report, floored at 0). Multiple saves on the
+    # same day MERGE into one daily entry — otherwise two reports in a day
+    # would read as two days of consumption and skew the EWMA.
     drawdown = max(0, (prev.get("current_stock") or 0) - body.current_stock)
     if drawdown > 0:
-        history = (prev.get("consumption_history") or [])[-13:]
-        updates["consumption_history"] = history + [drawdown]
+        today = _today()
+        history = list(prev.get("consumption_history") or [])
+        if prev.get("consumption_last_date") == today and history:
+            history[-1] += drawdown
+        else:
+            history = history[-13:] + [drawdown]
+        updates["consumption_history"] = history
+        updates["consumption_last_date"] = today
     ref.update(updates)
     return ok({"recomputed": recompute_centre(centre_id)})
 
@@ -79,6 +87,13 @@ def log_attendance(centre_id: str, body: AttendanceLog, user=Depends(get_current
 @router.patch("/{centre_id}/tests")
 def update_tests(centre_id: str, body: TestsUpdate, user=Depends(get_current_user)):
     require_own_centre(centre_id, user)
-    (_db().collection("centres").document(centre_id)
-     .collection("tests").document("current").set(body.tests, merge=True))
+    cref = _db().collection("centres").document(centre_id)
+    cref.collection("tests").document("current").set(body.tests, merge=True)
+    # Dated snapshot -> a real "test availability audit" trail (spec §4).
+    day = _today()
+    cref.collection("tests_history").document(day).set({
+        "date": day,
+        "available": body.tests,
+        "unavailable_count": sum(1 for v in body.tests.values() if v is False),
+    })
     return ok({"recomputed": recompute_centre(centre_id)})

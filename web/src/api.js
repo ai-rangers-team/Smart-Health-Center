@@ -9,8 +9,16 @@ export const api = axios.create({ baseURL: import.meta.env.VITE_API_BASE || "" }
 if (PREVIEW) {
   // Dev-only: canned AI responses so screens render without the backend.
   const lang = (url) => new URLSearchParams(url.split("?")[1] || "").get("lang") || "mr";
-  api.get = async (url) =>
-    url.includes("district-briefing") ? { briefing: PREVIEW_API.briefing[lang(url)] } : {};
+  api.get = async (url) => {
+    if (url.includes("district-briefing")) return { briefing: PREVIEW_API.briefing[lang(url)] };
+    if (url.includes("/api/ai/forecast/"))
+      return {
+        medicines: [],
+        narrative: PREVIEW_API.briefing[lang(url)],
+        footfall: { projection: 78, trend: "falling" },
+      };
+    return {};
+  };
   api.post = async (url) =>
     url.includes("explain-underperformance")
       ? { explanation: PREVIEW_API.explanation[lang(url)] }
