@@ -73,9 +73,16 @@ def district_briefing(district_id: str, lang: str = Query("mr"), user=Depends(ge
 
     text = gemini.district_briefing(
         len(alerts), critical, [a.get("message", "") for a in alerts], lang)
+    dref = _db().collection("districts").document(district_id)
     if text:  # never cache a failed (empty) Gemini response — retry next request
         _briefing_cache[cache_key] = (text, time.time() + 900, critical)  # 15-min TTL
-    return ok({"briefing": text, "cached": False})
+        # Persist as the last-good briefing so a rate-limited Gemini never
+        # leaves the dashboard without one (served with stale=true below).
+        dref.set({"last_briefing": {lang: text}}, merge=True)
+        return ok({"briefing": text, "cached": False})
+
+    stored = ((dref.get().to_dict() or {}).get("last_briefing") or {}).get(lang, "")
+    return ok({"briefing": stored, "cached": False, "stale": bool(stored)})
 
 
 @router.post("/redistribution/{district_id}")

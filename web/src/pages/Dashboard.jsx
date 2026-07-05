@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useCollection, useDoc } from "../hooks/useFirestore";
 import { useLang } from "../i18n/translations";
 import { DepletionBar, LanguageSwitch, Monogram, StatusBadge } from "../components/ui";
+import Typewriter from "../components/Typewriter";
 
 const STATUS_ORDER = { critical: 0, warning: 1, under_resourced: 2, underperforming: 2, operational: 3, healthy: 3 };
 
@@ -193,7 +194,9 @@ export default function Dashboard() {
                 <div className="h-3.5 w-2/3 rounded-bar bg-white/10" />
               </div>
             ) : (
-              <p className="text-base leading-relaxed text-ondark-bright">{briefing}</p>
+              <p className="text-base leading-relaxed text-ondark-bright">
+                <Typewriter text={briefing} />
+              </p>
             )}
           </section>
         )}
@@ -297,13 +300,16 @@ export default function Dashboard() {
                       {/* Gemini-written field instruction (in the language the
                           plan was generated in) — the AI artifact judges see */}
                       <p className="text-sm leading-relaxed">
-                        {(r.lang === lang && r.gemini_message) ||
+                        {r.lang === lang && r.gemini_message ? (
+                          <Typewriter text={r.gemini_message} />
+                        ) : (
                           t("reco_move", {
                             qty: r.quantity,
                             medicine: local("meds", r.medicine),
                             from: r.from_centre,
                             to: r.to_centre,
-                          })}
+                          })
+                        )}
                       </p>
                       {r.lang === lang && r.gemini_message && (
                         <p className="mt-0.5 text-xs text-ink-faint">
