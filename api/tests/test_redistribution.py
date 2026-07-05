@@ -58,3 +58,16 @@ def test_self_match_skipped_in_favour_of_other_donor():
     recs = compute_redistribution(centres)
     assert len(recs) == 1
     assert recs[0]["from_centre"] == "CHC" and recs[0]["to_centre"] == "Ambegaon"
+
+
+def test_recommendation_carries_display_name_not_doc_id():
+    centres = [
+        {"id": "chc", "name": "CHC", "stock": {
+            "ors": {"medicine_name": "ORS Sachets", "current_stock": 900,
+                    "reorder_level": 200, "daily_avg": 30, "days_remaining": 30}}},
+        {"id": "haveli", "name": "Haveli", "stock": {
+            "ors": {"medicine_name": "ORS Sachets", "current_stock": 90,
+                    "reorder_level": 200, "daily_avg": 45, "days_remaining": 2}}},
+    ]
+    recs = compute_redistribution(centres)
+    assert recs and recs[0]["medicine"] == "ORS Sachets"

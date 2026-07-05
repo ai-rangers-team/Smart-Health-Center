@@ -24,10 +24,14 @@ def _get_client():
 
 
 def generate(prompt: str, language: str = "mr") -> str:
-    full = f"{prompt}\n\nRespond in {_LANG.get(language, 'English')}. Be concise."
+    full = (f"{prompt}\n\nRespond in {_LANG.get(language, 'English')}. Be concise. "
+            "Plain text only — no markdown, no asterisks, no headings.")
     try:
         resp = _get_client().models.generate_content(model=settings.gemini_model, contents=full)
-        return (resp.text or "").strip()
+        text = (resp.text or "").strip()
+        # Belt-and-braces: strip any markdown bold/italics that slips through,
+        # since the UI renders this as plain text.
+        return text.replace("**", "").replace("__", "")
     except Exception:
         return ""
 

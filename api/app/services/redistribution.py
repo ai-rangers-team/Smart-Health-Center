@@ -43,7 +43,9 @@ def compute_redistribution(centres: list[dict]) -> list[dict]:
             recs.append({
                 "from_centre": donor["name"],
                 "to_centre": needy["name"],
-                "medicine": med,
+                # Human-readable name for instructions/UI; doc id kept for reference
+                "medicine": nd.get("medicine_name", med),
+                "medicine_id": med,
                 "quantity": qty,
                 "urgency": "critical" if nd["days_remaining"] <= 3 else "high",
             })

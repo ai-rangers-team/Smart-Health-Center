@@ -58,7 +58,15 @@ function useRealAuth() {
     centreId: claims.centre_id || null,
     districtId: claims.district_id || null,
     loading,
-    signIn: () => signInWithPopup(auth, googleProvider),
+    signIn: () =>
+      signInWithPopup(auth, googleProvider).catch((e) => {
+        // Benign: user closed the popup / clicked the button twice
+        if (
+          e?.code !== "auth/cancelled-popup-request" &&
+          e?.code !== "auth/popup-closed-by-user"
+        )
+          throw e;
+      }),
     signOut: () => fbSignOut(auth),
   };
 }

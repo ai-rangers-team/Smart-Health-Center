@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../hooks/useAuth";
 import { useLang } from "../i18n/translations";
@@ -89,13 +89,18 @@ export default function OnboardCentre() {
     <div className="mx-auto flex min-h-screen w-full max-w-phone flex-col bg-canvas md:max-w-4xl">
       <header className="bg-brand-deep px-5 pb-4 pt-3 text-white md:rounded-b-card">
         <div className="flex items-center justify-between">
-          <LanguageSwitch onDark />
-          <button
-            onClick={signOut}
-            className="rounded-headerpill bg-white/10 px-3 py-1.5 text-sm font-medium"
-          >
-            {t("sign_out")}
-          </button>
+          <Link to="/" className="text-sm font-medium text-ondark-soft hover:text-white">
+            &lsaquo; {t("all_centres")}
+          </Link>
+          <div className="flex items-center gap-3">
+            <LanguageSwitch onDark />
+            <button
+              onClick={signOut}
+              className="rounded-headerpill bg-white/10 px-3 py-1.5 text-sm font-medium"
+            >
+              {t("sign_out")}
+            </button>
+          </div>
         </div>
         <h1 className="mt-2 text-xl font-bold">{t("onboard_centre")}</h1>
       </header>

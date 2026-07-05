@@ -26,7 +26,7 @@ def test_high_stockout_becomes_warning():
 def test_bed_crisis_and_test_unavailable():
     alerts = build_alerts(
         "c", "C", "d", [],
-        beds={"available": 0}, attendance_rate=0.9,
+        beds={"total": 5, "available": 0}, attendance_rate=0.9,
         tests={"malaria": False, "tb": True, "pregnancy": True},
     )
     types = {x["type"] for x in alerts}
@@ -46,4 +46,12 @@ def test_healthy_centre_no_alerts():
         beds={"available": 3}, attendance_rate=0.9,
         tests={"malaria": True, "tb": True, "pregnancy": True},
     )
+    assert alerts == []
+
+
+def test_unconfigured_centre_no_bed_crisis():
+    # A freshly onboarded centre with 0 total beds must not fire BED_CRISIS.
+    alerts = build_alerts("new", "New Centre", "d", [],
+                          beds={"total": 0, "occupied": 0, "available": 0},
+                          attendance_rate=None, tests={})
     assert alerts == []
