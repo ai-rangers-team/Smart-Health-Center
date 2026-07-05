@@ -33,6 +33,7 @@ def _slugify(name: str) -> str:
 def create_centre(body: CentreCreate, user=Depends(require_role("district_admin"))):
     from app.seed.demo_data import MEDS, TESTS_ALL, provision_account
     from app.services.language import default_language_for_state
+    from app.services.thresholds import derive_stock_levels
     from app.services.recompute import recompute_centre
 
     district_id = user.get("district_id")
@@ -65,15 +66,20 @@ def create_centre(body: CentreCreate, user=Depends(require_role("district_admin"
         "name": body.name, "type": body.type, "district_id": district_id,
         "location": {"block": body.block},
         "district_avg_footfall": district_avg_footfall,
+        "expected_daily_patients": body.expected_daily_patients,
         "status": "operational",
         "default_language": default_language,
     })
 
-    for med_id, name, unit, reorder, minimum in MEDS:
+    for med_id, name, unit, _reorder, _minimum in MEDS:
+        levels = derive_stock_levels(med_id, body.expected_daily_patients)
         cref.collection("stock").document(med_id).set({
             "medicine_name": name, "unit": unit,
-            "current_stock": 0, "reorder_level": reorder, "min_threshold": minimum,
-            "daily_consumption_avg": 0, "consumption_history": [],
+            "current_stock": 0,
+            "reorder_level": levels["reorder_level"],
+            "min_threshold": levels["min_threshold"],
+            "daily_consumption_avg": levels["estimated_daily_usage"],
+            "consumption_history": [],
         })
 
     cref.collection("beds").document("current").set({"total": 0, "occupied": 0, "available": 0})

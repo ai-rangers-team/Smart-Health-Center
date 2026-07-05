@@ -19,9 +19,13 @@ function alertText(a, t, local) {
   const med = local("meds", a.medicine_name);
   switch (a.type) {
     case "STOCKOUT_CRITICAL":
-      return t("alert_stockout_critical", { medicine: med, days: a.days_remaining });
+      return a.days_remaining == null
+        ? t("alert_out_of_stock", { medicine: med })
+        : t("alert_stockout_critical", { medicine: med, days: a.days_remaining });
     case "STOCKOUT_WARNING":
-      return t("alert_stockout_warning", { medicine: med, days: a.days_remaining });
+      return a.days_remaining == null
+        ? t("alert_below_min", { medicine: med })
+        : t("alert_stockout_warning", { medicine: med, days: a.days_remaining });
     case "BED_CRISIS":
       return t("alert_bed_crisis");
     case "ATTENDANCE_LOW":
