@@ -15,11 +15,12 @@ from app.services import gemini
 from app.services.forecasting import forecast_stockout
 from app.services.recompute import recompute_centre
 from app.services.redistribution import compute_redistribution
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
-# district_id -> (briefing_text, expires_at_epoch, critical_count_at_generation)
-_briefing_cache: dict[str, tuple[str, float, int]] = {}
+# (district_id, lang) -> (briefing_text, expires_at_epoch, critical_count_at_generation)
+_briefing_cache: dict[tuple[str, str], tuple[str, float, int]] = {}
 
 
 def _db():
@@ -51,16 +52,20 @@ def forecast(centre_id: str, lang: str = Query("mr"), user=Depends(get_current_u
 @router.get("/district-briefing/{district_id}")
 def district_briefing(district_id: str, lang: str = Query("mr"), user=Depends(get_current_user)):
     alerts = [a.to_dict() for a in _db().collection("alerts")
-              .where("district_id", "==", district_id).where("resolved", "==", False).stream()]
+              .where(filter=FieldFilter("district_id", "==", district_id)).where(filter=FieldFilter("resolved", "==", False)).stream()]
     critical = sum(1 for a in alerts if a.get("severity") == "critical")
 
-    hit = _briefing_cache.get(district_id)
+    # Cache per (district, language) — a cached English briefing must not be
+    # served to a Marathi request. Still invalidates when the critical count
+    # changes (e.g. right after a live operator write).
+    cache_key = (district_id, lang)
+    hit = _briefing_cache.get(cache_key)
     if hit and hit[1] > time.time() and hit[2] == critical:
         return ok({"briefing": hit[0], "cached": True})
 
     text = gemini.district_briefing(
         len(alerts), critical, [a.get("message", "") for a in alerts], lang)
-    _briefing_cache[district_id] = (text, time.time() + 900, critical)  # 15-min TTL
+    _briefing_cache[cache_key] = (text, time.time() + 900, critical)  # 15-min TTL
     return ok({"briefing": text, "cached": False})
 
 
@@ -68,7 +73,7 @@ def district_briefing(district_id: str, lang: str = Query("mr"), user=Depends(ge
 def redistribution(district_id: str, lang: str = Query("mr"), user=Depends(get_current_user)):
     db = _db()
     centres = []
-    for c in db.collection("centres").where("district_id", "==", district_id).stream():
+    for c in db.collection("centres").where(filter=FieldFilter("district_id", "==", district_id)).stream():
         stock = {}
         for m in _stock_forecasts(c.id):
             stock[m["id"]] = {
