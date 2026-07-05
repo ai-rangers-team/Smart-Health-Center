@@ -86,6 +86,7 @@ def redistribution(district_id: str, lang: str = Query("mr"), user=Depends(get_c
         stock = {}
         for m in _stock_forecasts(c.id):
             stock[m["id"]] = {
+                "medicine_name": m.get("medicine_name") or m["id"],
                 "current_stock": m.get("current_stock", 0),
                 "reorder_level": m.get("reorder_level", 0),
                 "daily_avg": m.get("daily_consumption_avg", 1),
@@ -106,7 +107,8 @@ def redistribution(district_id: str, lang: str = Query("mr"), user=Depends(get_c
         r["gemini_message"] = gemini.redistribution_instruction(r, lang)
         db.collection("recommendations").add({
             **r, "district_id": district_id, "type": "REDISTRIBUTION",
-            "status": "pending", "created_at": firestore.SERVER_TIMESTAMP,
+            "status": "pending", "lang": lang,  # language the message was written in
+            "created_at": firestore.SERVER_TIMESTAMP,
         })
     return ok({"recommendations": recs})
 

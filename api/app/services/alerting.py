@@ -39,7 +39,9 @@ def build_alerts(centre_id, centre_name, district_id, stock_forecasts,
                            f'{m["days_remaining"]} days remaining',
             })
 
-    if beds and beds.get("available", 1) == 0:
+    # Only meaningful once a bed capacity is configured — a freshly onboarded
+    # centre with total=0 must not fire a false crisis.
+    if beds and beds.get("total", 0) > 0 and beds.get("available", 1) == 0:
         alerts.append(base | {
             "type": "BED_CRISIS",
             "severity": "high",

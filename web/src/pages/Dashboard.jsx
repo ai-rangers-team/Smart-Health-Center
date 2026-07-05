@@ -56,11 +56,14 @@ export default function Dashboard() {
   ], [did]);
 
   const [briefing, setBriefing] = useState("");
+  const [briefingLoading, setBriefingLoading] = useState(true);
   useEffect(() => {
+    setBriefingLoading(true);
     api
       .get(`/api/ai/district-briefing/${did}?lang=${lang}`)
       .then((d) => setBriefing(d.briefing))
-      .catch(() => setBriefing(""));
+      .catch(() => setBriefing(""))
+      .finally(() => setBriefingLoading(false));
   }, [did, lang]);
 
   const [acked, setAcked] = useState({});
@@ -156,14 +159,35 @@ export default function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-district space-y-6 px-6 py-6 sm:px-10">
-        {briefing && (
+        {(briefing || briefingLoading) && (
           <section className="flex flex-col gap-3 rounded-card bg-brand-darkest p-6 sm:flex-row sm:items-start sm:gap-6">
             <span className="inline-flex shrink-0 items-center rounded-chip border border-ondark-subtle/40 px-3.5 py-1.5 text-xs font-bold tracking-wide text-ondark-soft">
               {t("ai_briefing").toUpperCase()}
             </span>
-            <p className="text-base leading-relaxed text-ondark-bright">{briefing}</p>
+            {briefingLoading && !briefing ? (
+              <div className="w-full animate-pulse space-y-2.5 py-1">
+                <div className="h-3.5 w-11/12 rounded-bar bg-white/15" />
+                <div className="h-3.5 w-4/5 rounded-bar bg-white/10" />
+                <div className="h-3.5 w-2/3 rounded-bar bg-white/10" />
+              </div>
+            ) : (
+              <p className="text-base leading-relaxed text-ondark-bright">{briefing}</p>
+            )}
           </section>
         )}
+
+        {(() => {
+          const so = alerts.filter(
+            (a) => a.type?.startsWith("STOCKOUT") && a.days_remaining != null && !resolved[a.id]
+          );
+          if (!so.length) return null;
+          const avg = Math.round(so.reduce((s, a) => s + a.days_remaining, 0) / so.length);
+          return (
+            <p className="text-sm font-medium text-brand">
+              {t("impact_line", { n: so.length, d: avg })}
+            </p>
+          );
+        })()}
 
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile
@@ -182,9 +206,14 @@ export default function Dashboard() {
         </section>
 
         <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
-        {activeAlerts.length > 0 && (
-          <section className="rounded-card border border-line bg-surface p-6">
-            <h2 className="text-lg font-semibold">{t("active_alerts")}</h2>
+        <section className="rounded-card border border-line bg-surface p-6">
+          <h2 className="text-lg font-semibold">{t("active_alerts")}</h2>
+          {activeAlerts.length === 0 ? (
+            <p className="mt-4 flex items-center gap-2 text-sm font-medium text-status-healthy-deep">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-status-healthy-soft text-xs">✓</span>
+              {t("all_clear_district")}
+            </p>
+          ) : (
             <ul className="mt-4 divide-y divide-line-light">
               {activeAlerts.map((a) => (
                 <li
@@ -212,8 +241,8 @@ export default function Dashboard() {
                 </li>
               ))}
             </ul>
-          </section>
-        )}
+          )}
+        </section>
 
         <section className="rounded-card border border-line bg-surface p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -246,7 +275,7 @@ export default function Dashboard() {
                       {/* Gemini-written field instruction (in the language the
                           plan was generated in) — the AI artifact judges see */}
                       <p className="text-sm leading-relaxed">
-                        {r.gemini_message ||
+                        {(r.lang === lang && r.gemini_message) ||
                           t("reco_move", {
                             qty: r.quantity,
                             medicine: local("meds", r.medicine),
@@ -254,7 +283,7 @@ export default function Dashboard() {
                             to: r.to_centre,
                           })}
                       </p>
-                      {r.gemini_message && (
+                      {r.lang === lang && r.gemini_message && (
                         <p className="mt-0.5 text-xs text-ink-faint">
                           {r.from_centre} → {r.to_centre} · {r.quantity} ×{" "}
                           {local("meds", r.medicine)}
@@ -362,7 +391,7 @@ function CentreCard({ centre, alerts }) {
         </div>
         <div>
           <p className="tabular text-2xl font-bold">
-            {centre.beds_occupied ?? "—"}/{centre.beds_total ?? "—"}
+            {centre.beds_available ?? "—"}/{centre.beds_total ?? "—"}
           </p>
           <p className="text-xs text-ink-muted">{t("beds_available")}</p>
         </div>

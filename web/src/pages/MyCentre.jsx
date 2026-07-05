@@ -22,6 +22,10 @@ export default function MyCentre() {
   const stockRows = useCollection(`centres/${centreId}/stock`);
   const bedsDoc = useDoc(`centres/${centreId}/beds/current`);
   const testsDoc = useDoc(`centres/${centreId}/tests/current`);
+  // Today's already-reported values (UTC date key, same as the backend writes)
+  const todayKey = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const todayFootfall = useDoc(`centres/${centreId}/footfall/${todayKey}`);
+  const todayAttendance = useDoc(`centres/${centreId}/attendance/${todayKey}`);
 
   // One-time regional default: only applies if the operator hasn't already
   // chosen a language, and never re-fires once they have.
@@ -46,6 +50,16 @@ export default function MyCentre() {
       setBedsTotal(bedsDoc.total || 0);
     }
   }, [bedsDoc]);
+  // Prefill today's report if it was already sent — editing, not re-entering
+  useEffect(() => {
+    if (todayFootfall) setPatients(todayFootfall.count || 0);
+  }, [todayFootfall]);
+  useEffect(() => {
+    if (todayAttendance) {
+      setDocsPresent(todayAttendance.doctors_present || 0);
+      setDocsTotal(todayAttendance.doctors_total || 2);
+    }
+  }, [todayAttendance]);
   useEffect(() => {
     if (testsDoc)
       setTests(Object.fromEntries(TESTS.map((k) => [k, testsDoc[k] !== false])));
@@ -184,12 +198,15 @@ export default function MyCentre() {
               <p className="text-sm text-ink-muted">
                 {bedsOccupied} {t("of")} {bedsTotal}
               </p>
-              <div className="mt-4 flex justify-center">
-                <Stepper value={bedsOccupied} onChange={setBedsOccupied} />
-              </div>
-              <div className="mt-4 flex items-center justify-between gap-3 border-t border-line-light pt-3">
-                <p className="text-sm text-ink-muted">{t("total_beds_label")}</p>
-                <Stepper value={bedsTotal} onChange={setBedsTotal} />
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm">{t("occupied_label")}</p>
+                  <Stepper value={bedsOccupied} onChange={setBedsOccupied} />
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-line-light pt-3">
+                  <p className="text-sm text-ink-muted">{t("total_beds_label")}</p>
+                  <Stepper value={bedsTotal} onChange={setBedsTotal} />
+                </div>
               </div>
             </section>
 

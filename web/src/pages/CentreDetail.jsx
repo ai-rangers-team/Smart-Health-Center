@@ -158,7 +158,7 @@ export default function CentreDetail() {
 
             <div className="mt-6">
               <p className="text-xs font-semibold tracking-wide text-ink-faint">
-                {t("patients_last_7").toUpperCase()}
+                {t("attendance_last_7").toUpperCase()}
               </p>
               <div className="mt-2 h-36">
                 <ResponsiveContainer>
