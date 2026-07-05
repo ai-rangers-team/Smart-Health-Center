@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../hooks/useAuth";
 import { useLang } from "../i18n/translations";
-import { Choice2, LanguageSwitch } from "../components/ui";
+import { Choice2, LanguageSwitch, Stepper } from "../components/ui";
 
 const inputClass =
   "mt-3 w-full rounded-stepper-sm border border-line-control bg-canvas px-3.5 py-2.5 text-ink focus:border-brand focus:outline-none";
@@ -22,7 +22,9 @@ export default function OnboardCentre() {
   const [isPHC, setIsPHC] = useState(true);
   const [block, setBlock] = useState("");
   const [operatorEmail, setOperatorEmail] = useState("");
+  const [expectedPatients, setExpectedPatients] = useState(60);
   const [saving, setSaving] = useState(false);
+  const [bulk, setBulk] = useState(null); // {done, total, created, failed: [{line, error}]}
   const [error, setError] = useState("");
   const [created, setCreated] = useState(null); // {centre_id, operator}
 
@@ -35,6 +37,7 @@ export default function OnboardCentre() {
         type: isPHC ? "PHC" : "CHC",
         block,
         operator_email: operatorEmail || null,
+        expected_daily_patients: expectedPatients || null,
       });
       setCreated(res);
     } catch (e) {
@@ -43,6 +46,50 @@ export default function OnboardCentre() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  function downloadTemplate() {
+    const csv =
+      "name,type,block,operator_email,expected_daily_patients\n" +
+      "PHC Wagholi,PHC,Wagholi Taluka,operator@example.com,60\n" +
+      "PHC Shirur,PHC,Shirur Taluka,,80\n";
+    const a = document.createElement("a");
+    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    a.download = "centres_template.csv";
+    a.click();
+  }
+
+  async function handleBulkFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    // Skip a header row if present
+    const rows = /^name\s*,/i.test(lines[0]) ? lines.slice(1) : lines;
+    const failed = [];
+    let createdCount = 0;
+    setBulk({ done: 0, total: rows.length, created: 0, failed: [] });
+    for (let i = 0; i < rows.length; i++) {
+      const [rname, rtype, rblock, remail, rpatients] = rows[i]
+        .split(",")
+        .map((c) => (c || "").trim());
+      try {
+        if (!rname || !rblock) throw { error: "name and block are required" };
+        await api.post("/api/centres", {
+          name: rname,
+          type: (rtype || "PHC").toUpperCase() === "CHC" ? "CHC" : "PHC",
+          block: rblock,
+          operator_email: remail || null,
+          expected_daily_patients: parseInt(rpatients, 10) || null,
+        });
+        createdCount++;
+      } catch (err) {
+        failed.push({ line: rname || `line ${i + 1}`, error: err?.detail || err?.error || "failed" });
+      }
+      setBulk({ done: i + 1, total: rows.length, created: createdCount, failed });
     }
   }
 
@@ -141,6 +188,14 @@ export default function OnboardCentre() {
           </section>
 
           <section className="rounded-card border border-line bg-surface p-5">
+            <h2 className="font-semibold">{t("expected_patients_label")}</h2>
+            <p className="mt-1 text-xs text-ink-muted">{t("expected_patients_hint")}</p>
+            <div className="mt-4 flex justify-center">
+              <Stepper value={expectedPatients} onChange={setExpectedPatients} min={1} />
+            </div>
+          </section>
+
+          <section className="rounded-card border border-line bg-surface p-5">
             <h2 className="font-semibold">{t("operator_email_label")}</h2>
             <input
               value={operatorEmail}
@@ -150,6 +205,49 @@ export default function OnboardCentre() {
               className={inputClass}
             />
             <p className="mt-2 text-xs text-ink-muted">{t("operator_email_hint")}</p>
+          </section>
+
+          <section className="rounded-card border border-line bg-surface p-5">
+            <h2 className="font-semibold">{t("bulk_title")}</h2>
+            <p className="mt-1 text-xs text-ink-muted">{t("bulk_hint")}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={downloadTemplate}
+                className="rounded-action border border-line-control px-4 py-2.5 text-sm font-semibold text-ink hover:bg-line-light"
+              >
+                {t("bulk_template")}
+              </button>
+              <label className="cursor-pointer rounded-action bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-deep">
+                {t("bulk_upload")}
+                <input type="file" accept=".csv,text/csv" onChange={handleBulkFile} className="hidden" />
+              </label>
+            </div>
+            {bulk && (
+              <div className="mt-4 space-y-2 text-sm">
+                {bulk.done < bulk.total ? (
+                  <p className="font-medium">
+                    {t("bulk_progress", { done: bulk.done + 1, total: bulk.total })}
+                  </p>
+                ) : (
+                  <p className="font-medium text-status-healthy-deep">
+                    {t("bulk_done", { n: bulk.created })}
+                  </p>
+                )}
+                {bulk.failed.length > 0 && bulk.done >= bulk.total && (
+                  <div className="rounded-action bg-status-critical-soft p-3 text-status-critical">
+                    <p className="font-semibold">{t("bulk_failed", { n: bulk.failed.length })}</p>
+                    <ul className="mt-1 list-inside list-disc">
+                      {bulk.failed.map((f, i) => (
+                        <li key={i}>
+                          {f.line} — {f.error}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         </div>
       </main>

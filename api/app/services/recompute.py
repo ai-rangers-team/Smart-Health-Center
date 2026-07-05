@@ -32,7 +32,13 @@ def recompute_centre(centre_id: str) -> dict:
             "days_remaining": fc["days_remaining"],
             "predicted_stockout_date": fc["predicted_stockout_date"],
         })
-        forecasts.append({"medicine_name": m.get("medicine_name"), **fc})
+        forecasts.append({
+            "medicine_name": m.get("medicine_name"),
+            # For the cold-start threshold fallback in alerting:
+            "current_stock": m.get("current_stock", 0),
+            "min_threshold": m.get("min_threshold", 0),
+            **fc,
+        })
 
     # 2. Current beds / tests
     beds = (cref.collection("beds").document("current").get().to_dict()) or {}

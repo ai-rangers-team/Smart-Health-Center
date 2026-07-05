@@ -49,3 +49,5 @@ class CentreCreate(BaseModel):
     type: Literal["PHC", "CHC"]
     block: str = Field(min_length=1)
     operator_email: str | None = None
+    # "Roughly how many patients per day?" — drives cold-start stock levels
+    expected_daily_patients: int | None = Field(default=None, ge=1, le=2000)

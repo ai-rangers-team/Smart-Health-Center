@@ -38,6 +38,29 @@ def build_alerts(centre_id, centre_name, district_id, stock_forecasts,
                 "message": f'{m["medicine_name"]} low: '
                            f'{m["days_remaining"]} days remaining',
             })
+        elif m.get("days_remaining", 0) >= 999:
+            # Cold start: no consumption history yet, so no forecast exists.
+            # Fall back to the admin-set stock levels (days_remaining=None
+            # signals "threshold-based, not forecast-based" to the UI).
+            stock = m.get("current_stock", 0)
+            minimum = m.get("min_threshold", 0)
+            if stock <= 0:
+                alerts.append(base | {
+                    "type": "STOCKOUT_CRITICAL",
+                    "severity": "critical",
+                    "medicine_name": m["medicine_name"],
+                    "days_remaining": None,
+                    "message": f'{m["medicine_name"]} is out of stock',
+                })
+            elif minimum and stock <= minimum:
+                alerts.append(base | {
+                    "type": "STOCKOUT_WARNING",
+                    "severity": "high",
+                    "medicine_name": m["medicine_name"],
+                    "days_remaining": None,
+                    "message": f'{m["medicine_name"]} below minimum stock level '
+                               f'({stock} of {minimum})',
+                })
 
     # Only meaningful once a bed capacity is configured — a freshly onboarded
     # centre with total=0 must not fire a false crisis.
