@@ -49,6 +49,15 @@ export default function CentreDetail() {
       .catch(() => setExplanation(""));
   }, [centreId, flagged, lang]);
 
+  // AI demand forecast: footfall projection + Gemini stock outlook (spec §6.4)
+  const [forecast, setForecast] = useState(null);
+  useEffect(() => {
+    api
+      .get(`/api/ai/forecast/${centreId}?lang=${lang}`)
+      .then((d) => setForecast(d))
+      .catch(() => setForecast(null));
+  }, [centreId, lang]);
+
   if (!centre) return <div className="p-10 text-ink-muted">Loading…</div>;
 
   const attData = [...attendance].reverse().map((a) => ({
@@ -204,10 +213,47 @@ export default function CentreDetail() {
           </section>
         </div>
 
+        {forecast?.narrative && (
+          <section className="rounded-card bg-brand-darkest p-5">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-ondark-soft">
+              <span className="rounded-headerpill bg-white/10 px-2 py-0.5 text-xs font-bold">
+                AI
+              </span>
+              {t("stock_outlook")}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ondark-bright">
+              {forecast.narrative}
+            </p>
+          </section>
+        )}
+
         <section className="rounded-card border border-line bg-surface p-6">
-          <p className="text-xs font-semibold tracking-wide text-ink-faint">
-            {t("footfall_last_30").toUpperCase()}
-          </p>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs font-semibold tracking-wide text-ink-faint">
+              {t("footfall_last_30").toUpperCase()}
+            </p>
+            {forecast?.footfall?.projection != null && (
+              <p className="text-sm font-medium">
+                {t("expected_tomorrow")}:{" "}
+                <span className="tabular font-bold">~{forecast.footfall.projection}</span>{" "}
+                <span
+                  className={
+                    forecast.footfall.trend === "falling"
+                      ? "text-status-critical"
+                      : forecast.footfall.trend === "rising"
+                      ? "text-status-healthy"
+                      : "text-ink-muted"
+                  }
+                >
+                  {forecast.footfall.trend === "falling"
+                    ? "▾ " + t("trend_falling")
+                    : forecast.footfall.trend === "rising"
+                    ? "▴ " + t("trend_rising")
+                    : t("trend_stable")}
+                </span>
+              </p>
+            )}
+          </div>
           <div className="mt-3 h-44">
             <ResponsiveContainer>
               <LineChart data={footData}>
