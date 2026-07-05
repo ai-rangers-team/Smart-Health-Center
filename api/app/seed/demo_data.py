@@ -200,19 +200,6 @@ def seed_district():
     return results
 
 
-<<<<<<< HEAD
-def provision_account(email: str, role: str, district_id: str, centre_id: str | None) -> bool:
-    """Attach role custom-claims to one account. Returns True if provisioned,
-    False if the account has never signed in yet (caller should treat this as
-    a soft skip, not an error)."""
-    try:
-        u = auth.get_user_by_email(email)
-        auth.set_custom_user_claims(u.uid, {
-            "role": role, "district_id": district_id, "centre_id": centre_id})
-        return True
-    except auth.UserNotFoundError:
-        return False
-=======
 def _roles_collection():
     return _db().collection("roles")
 
@@ -233,23 +220,29 @@ def set_role(email: str, role: str, centre_id: str | None = None):
     editing DEFAULT_ROLES in code — call this (or edit the `roles` collection
     in the Firestore console) instead of changing this file."""
     _roles_collection().document(email).set({"role": role, "centre_id": centre_id})
->>>>>>> main
+
+
+def provision_account(email: str, role: str, district_id: str, centre_id: str | None) -> bool:
+    """Attach role custom-claims to one account AND record it in the `roles`
+    collection (source of truth), so accounts that haven't signed in yet get
+    their claims on the next provision_accounts() run. Returns False for the
+    never-signed-in case (soft skip, not an error)."""
+    set_role(email, role, centre_id)
+    try:
+        u = auth.get_user_by_email(email)
+        auth.set_custom_user_claims(u.uid, {
+            "role": role, "district_id": district_id, "centre_id": centre_id})
+        return True
+    except auth.UserNotFoundError:
+        return False
 
 
 def provision_accounts():
     """Attach role custom-claims to accounts (from the `roles` Firestore
     collection) that exist in Firebase Auth."""
     done, skipped = [], []
-<<<<<<< HEAD
-    for email, (role, centre_id) in DEMO_ACCOUNTS.items():
-        if provision_account(email, role, DISTRICT["id"], centre_id):
-=======
     for email, (role, centre_id) in _load_roles().items():
-        try:
-            u = auth.get_user_by_email(email)
-            auth.set_custom_user_claims(u.uid, {
-                "role": role, "district_id": DISTRICT["id"], "centre_id": centre_id})
->>>>>>> main
+        if provision_account(email, role, DISTRICT["id"], centre_id):
             done.append(email)
         else:
             skipped.append(email)  # must sign in once first, then re-run
