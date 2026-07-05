@@ -55,7 +55,16 @@ jobs:
             --image="$IMAGE" \
             --region=${{ env.REGION }} \
             --platform=managed \
-            --min-instances=1 \
+            --min-instances=1
+
+      - name: Pin Gemini API key
+        run: |
+          # The service originally referenced Secret Manager for this var; a
+          # literal cannot overwrite a secret-type var in one call, so drop
+          # the secret mapping first (tolerate it already being gone).
+          gcloud run services update ${{ env.SERVICE }} --region=${{ env.REGION }} \
+            --remove-secrets=GEMINI_API_KEY || true
+          gcloud run services update ${{ env.SERVICE }} --region=${{ env.REGION }} \
             --update-env-vars=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
 
       - name: Show service URL
