@@ -11,6 +11,7 @@ from firebase_admin import auth
 
 from app.services.language import default_language_for_state
 from app.services.recompute import recompute_centre
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 DISTRICT = {"id": "pune_rural", "name": "Pune Rural District", "state": "Maharashtra"}
 DISTRICT_AVG_FOOTFALL = 78
@@ -126,13 +127,13 @@ def _dates(n: int):
 def wipe_district():
     """Delete district data (centres + subcollections, alerts, recommendations)."""
     db = _db()
-    for cref in db.collection("centres").where("district_id", "==", DISTRICT["id"]).stream():
+    for cref in db.collection("centres").where(filter=FieldFilter("district_id", "==", DISTRICT["id"])).stream():
         for sub in ("stock", "beds", "tests", "attendance", "footfall"):
             for d in cref.reference.collection(sub).stream():
                 d.reference.delete()
         cref.reference.delete()
     for coll in ("alerts", "recommendations"):
-        for d in db.collection(coll).where("district_id", "==", DISTRICT["id"]).stream():
+        for d in db.collection(coll).where(filter=FieldFilter("district_id", "==", DISTRICT["id"])).stream():
             d.reference.delete()
 
 

@@ -54,7 +54,8 @@ jobs:
           gcloud run deploy ${{ env.SERVICE }} \
             --image="$IMAGE" \
             --region=${{ env.REGION }} \
-            --platform=managed
+            --platform=managed \
+            --min-instances=1
 
       - name: Show service URL
         run: gcloud run services describe ${{ env.SERVICE }} --region=${{ env.REGION }} --format="value(status.url)"

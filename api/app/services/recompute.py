@@ -10,6 +10,7 @@ from firebase_admin import firestore
 from app.services import alerting
 from app.services.forecasting import forecast_stockout
 from app.services.scoring import compute_performance_score
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 
 def _db():
@@ -84,8 +85,8 @@ def recompute_centre(centre_id: str) -> dict:
 
     # 6. Replace this centre's active alerts (templates — no Gemini here)
     for a in (db.collection("alerts")
-              .where("centre_id", "==", centre_id)
-              .where("resolved", "==", False).stream()):
+              .where(filter=FieldFilter("centre_id", "==", centre_id))
+              .where(filter=FieldFilter("resolved", "==", False)).stream()):
         a.reference.delete()
     for a in alerting.build_alerts(centre_id, centre.get("name"), centre.get("district_id"),
                                    forecasts, beds, avg_attendance, tests):

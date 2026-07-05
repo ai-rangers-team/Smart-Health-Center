@@ -10,6 +10,7 @@ import requests
 from firebase_admin import auth
 
 from app.firestore_client import db  # noqa: F401  (initialises firebase)
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 API_KEY = "AIzaSyAAhHNTBlZul_WD8W23njWj5euVv1ftSo0"
 BASE = "http://localhost:8000"
@@ -86,7 +87,7 @@ check("operator stock write + recompute", r["success"],
       f'status={r["data"]["recomputed"]["status"]}')
 
 alerts = [a.to_dict() for a in db.collection("alerts")
-          .where("centre_id", "==", "phc_mulshi").where("resolved", "==", False).stream()]
+          .where(filter=FieldFilter("centre_id", "==", "phc_mulshi")).where(filter=FieldFilter("resolved", "==", False)).stream()]
 crit = [a for a in alerts if a["type"] == "STOCKOUT_CRITICAL"
         and a.get("medicine_name") == "Paracetamol 500mg"]
 check("fresh critical alert regenerated", bool(crit),
@@ -109,12 +110,12 @@ for name, method, path, body in [
 
 print("\n-- alert resolve + recommendation acknowledge (admin) --")
 alert_id = next(a.id for a in db.collection("alerts")
-                .where("centre_id", "==", "phc_mulshi")
-                .where("resolved", "==", False).stream())
+                .where(filter=FieldFilter("centre_id", "==", "phc_mulshi"))
+                .where(filter=FieldFilter("resolved", "==", False)).stream())
 r = requests.post(f"{BASE}/api/alerts/{alert_id}/resolve", headers=A)
 check("alert resolve", r.status_code == 200 and r.json()["success"])
 rec_id = next((x.id for x in db.collection("recommendations")
-               .where("status", "==", "pending").stream()), None)
+               .where(filter=FieldFilter("status", "==", "pending")).stream()), None)
 if rec_id:
     r = requests.post(f"{BASE}/api/recommendations/{rec_id}/acknowledge", headers=A)
     check("recommendation acknowledge", r.status_code == 200 and r.json()["success"])

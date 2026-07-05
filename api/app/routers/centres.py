@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.deps import get_current_user, require_role
 from app.models.schemas import CentreCreate, ok
 from app.services.forecasting import forecast_footfall, forecast_stockout
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 router = APIRouter(prefix="/api/centres", tags=["centres"])
 
@@ -47,7 +48,7 @@ def create_centre(body: CentreCreate, user=Depends(require_role("district_admin"
     if cref.get().exists:
         raise HTTPException(status_code=409, detail=f"A centre with id '{centre_id}' already exists")
 
-    siblings = list(db.collection("centres").where("district_id", "==", district_id).stream())
+    siblings = list(db.collection("centres").where(filter=FieldFilter("district_id", "==", district_id)).stream())
     footfalls = [s.to_dict().get("district_avg_footfall", 0) for s in siblings]
     district_avg_footfall = (
         round(sum(footfalls) / len(footfalls)) if footfalls else _DEFAULT_DISTRICT_AVG_FOOTFALL
