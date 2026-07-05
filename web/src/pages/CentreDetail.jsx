@@ -17,6 +17,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useCollection, useDoc } from "../hooks/useFirestore";
 import { useLang } from "../i18n/translations";
 import { DepletionBar, LanguageSwitch, StatusBadge } from "../components/ui";
+import Typewriter from "../components/Typewriter";
 
 const ESSENTIAL_TESTS = ["malaria", "tb", "pregnancy", "diabetes", "hiv"];
 
@@ -113,7 +114,7 @@ export default function CentreDetail() {
               {t("why_flagged")}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-status-underperforming-deep">
-              {explanation}
+              <Typewriter text={explanation} />
             </p>
           </section>
         )}
@@ -222,7 +223,7 @@ export default function CentreDetail() {
               {t("stock_outlook")}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-ondark-bright">
-              {forecast.narrative}
+              <Typewriter text={forecast.narrative} />
             </p>
           </section>
         )}
