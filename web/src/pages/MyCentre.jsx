@@ -43,6 +43,9 @@ export default function MyCentre() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(null); // {at, patients, docsPresent, docsTotal, bedsOccupied}
   const [error, setError] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const [invoiceReview, setInvoiceReview] = useState(null); // {unmatched: [names]}
+  const [invoiceError, setInvoiceError] = useState("");
 
   useEffect(() => {
     if (bedsDoc) {
@@ -106,6 +109,30 @@ export default function MyCentre() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleInvoiceFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file || !centreId) return;
+    setExtracting(true);
+    setInvoiceError("");
+    setInvoiceReview(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await api.post(`/api/centres/${centreId}/stock/extract`, form);
+      setStock((s) => {
+        const next = { ...s };
+        for (const item of res.items || []) next[item.medicine_id] = item.proposed_stock;
+        return next;
+      });
+      setInvoiceReview({ unmatched: res.unmatched || [] });
+    } catch (e) {
+      setInvoiceError(e?.detail || e?.error || t("invoice_extract_failed"));
+    } finally {
+      setExtracting(false);
     }
   }
 
@@ -245,8 +272,38 @@ export default function MyCentre() {
 
           {/* Right column: medicines */}
           <section className="rounded-card border border-line bg-surface p-5">
-            <h2 className="font-semibold">{t("medicine_stock")}</h2>
-            <p className="text-sm text-ink-muted">{t("how_much_left")}</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">{t("medicine_stock")}</h2>
+                <p className="text-sm text-ink-muted">{t("how_much_left")}</p>
+              </div>
+              <label className="shrink-0 cursor-pointer rounded-action border border-line-control px-3 py-2 text-xs font-semibold text-ink hover:bg-line-light">
+                {extracting ? t("invoice_extracting") : t("scan_invoice")}
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  capture="environment"
+                  disabled={extracting}
+                  onChange={handleInvoiceFile}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            {invoiceReview && (
+              <div className="mt-3 rounded-action bg-status-healthy-soft p-3 text-sm text-status-healthy-deep">
+                <p className="font-medium">{t("invoice_extracted_review")}</p>
+                {invoiceReview.unmatched.length > 0 && (
+                  <p className="mt-1 text-status-healthy-deep/80">
+                    {t("invoice_unmatched", { names: invoiceReview.unmatched.join(", ") })}
+                  </p>
+                )}
+              </div>
+            )}
+            {invoiceError && (
+              <p className="mt-3 rounded-action bg-status-critical-soft p-3 text-sm font-medium text-status-critical">
+                {invoiceError}
+              </p>
+            )}
             <ul className="mt-4 space-y-5">
               {stockRows.map((m) => (
                 <li
