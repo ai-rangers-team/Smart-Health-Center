@@ -6,14 +6,18 @@ dashboard updates within ~1s via Firestore listeners.
 """
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.deps import get_current_user, require_own_centre
 from app.models.schemas import (AttendanceLog, BedsUpdate, FootfallLog, StockUpdate,
                                 TestsUpdate, ok)
+from app.services.invoice_extract import extract_restock_items
 from app.services.recompute import recompute_centre
 
 router = APIRouter(prefix="/api/centres", tags=["operator"])
+
+_ALLOWED_INVOICE_TYPES = {"application/pdf", "image/jpeg", "image/png"}
+_MAX_INVOICE_BYTES = 8 * 1024 * 1024
 
 
 def _db():
@@ -49,6 +53,47 @@ def update_stock(centre_id: str, body: StockUpdate, user=Depends(get_current_use
         updates["consumption_last_date"] = today
     ref.update(updates)
     return ok({"recomputed": recompute_centre(centre_id)})
+
+
+@router.post("/{centre_id}/stock/extract")
+async def extract_stock_from_document(centre_id: str, file: UploadFile = File(...),
+                                       user=Depends(get_current_user)):
+    """Reads a restock invoice photo/PDF and proposes stock updates for review —
+    never writes. The operator confirms via the normal PATCH /stock flow above."""
+    require_own_centre(centre_id, user)
+    if file.content_type not in _ALLOWED_INVOICE_TYPES:
+        raise HTTPException(status_code=400,
+                             detail="Unsupported file type — upload a PDF or a photo (JPG/PNG).")
+    data = await file.read()
+    if len(data) > _MAX_INVOICE_BYTES:
+        raise HTTPException(status_code=400, detail="File too large — max 8MB.")
+
+    stock_docs = list(_db().collection("centres").document(centre_id).collection("stock").stream())
+    catalog = [{"id": d.id, "name": (d.to_dict() or {}).get("medicine_name", d.id),
+                "unit": (d.to_dict() or {}).get("unit", ""),
+                "current_stock": (d.to_dict() or {}).get("current_stock", 0) or 0}
+               for d in stock_docs]
+    by_id = {c["id"]: c for c in catalog}
+
+    try:
+        extracted = extract_restock_items(data, file.content_type, catalog)
+    except Exception:
+        raise HTTPException(status_code=502,
+                             detail="Could not read the document. Try again or enter stock manually.")
+
+    items, unmatched = [], []
+    for e in extracted:
+        cat = by_id.get(e.medicine_id) if e.medicine_id else None
+        if not cat:
+            unmatched.append(e.raw_name)
+            continue
+        items.append({
+            "medicine_id": cat["id"], "medicine_name": cat["name"], "unit": cat["unit"],
+            "current_stock": cat["current_stock"], "quantity_received": e.quantity,
+            "proposed_stock": cat["current_stock"] + e.quantity,
+            "confidence": e.confidence,
+        })
+    return ok({"items": items, "unmatched": unmatched})
 
 
 @router.patch("/{centre_id}/beds")

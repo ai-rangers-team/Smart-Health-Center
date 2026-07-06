@@ -119,6 +119,11 @@ export const translations = {
     operator_provisioned_yes: "Operator access granted.",
     operator_provisioned_pending: "Operator access will apply once they sign in.",
     total_beds_label: "Total beds",
+    scan_invoice: "Scan restock invoice",
+    invoice_extracting: "Reading document…",
+    invoice_extracted_review: "Extracted from invoice — review the amounts below before saving",
+    invoice_unmatched: "Could not match: {names} — enter these manually",
+    invoice_extract_failed: "Could not read the document. Try again or enter stock manually.",
   },
   hi: {
     app_name: "Smart Health Centre",
@@ -232,6 +237,11 @@ export const translations = {
     operator_provisioned_yes: "ऑपरेटर एक्सेस दे दिया गया।",
     operator_provisioned_pending: "साइन इन करने के बाद ऑपरेटर एक्सेस लागू होगा।",
     total_beds_label: "कुल बिस्तर",
+    scan_invoice: "पुनःपूर्ति चालान स्कैन करें",
+    invoice_extracting: "दस्तावेज़ पढ़ा जा रहा है…",
+    invoice_extracted_review: "चालान से निकाला गया — सहेजने से पहले नीचे मात्राएँ जाँच लें",
+    invoice_unmatched: "मेल नहीं हुआ: {names} — इन्हें मैन्युअल रूप से दर्ज करें",
+    invoice_extract_failed: "दस्तावेज़ नहीं पढ़ सके। फिर से कोशिश करें या भंडार मैन्युअल रूप से दर्ज करें।",
   },
   mr: {
     app_name: "Smart Health Centre",
@@ -345,6 +355,11 @@ export const translations = {
     operator_provisioned_yes: "ऑपरेटरला प्रवेश दिला.",
     operator_provisioned_pending: "साइन इन केल्यावर ऑपरेटर प्रवेश लागू होईल.",
     total_beds_label: "एकूण खाटा",
+    scan_invoice: "पुनःपुरवठा पावती स्कॅन करा",
+    invoice_extracting: "कागदपत्र वाचत आहे…",
+    invoice_extracted_review: "पावतीमधून काढले — जतन करण्यापूर्वी खालील प्रमाणे तपासा",
+    invoice_unmatched: "जुळले नाही: {names} — हे स्वहस्ते नोंदवा",
+    invoice_extract_failed: "कागदपत्र वाचता आले नाही. पुन्हा प्रयत्न करा किंवा साठा स्वहस्ते नोंदवा.",
   },
 };
 
