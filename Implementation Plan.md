@@ -78,7 +78,21 @@ smart-health/
 
 **Parallelization:** Within each phase, tasks are grouped by owner (BE = backend core, AI = forecasting/Gemini, FE = frontend, IN = infra). Tasks in different groups within a phase can run concurrently once their listed dependencies are met.
 
-## Progress Notes (updated July 3, evening)
+## Progress Notes (updated July 7, night)
+
+- **Devik's invoice OCR merged to main and deployed.** `POST
+  /api/centres/{id}/stock/extract` (Gemini vision, structured JSON output,
+  catalog-constrained matching) + "Scan restock invoice" flow in MyCentre.
+  Propose-then-confirm design — extraction never writes; the operator saves via
+  the normal stock PATCH, so recompute/alerts stay intact. 60 tests green
+  (incl. 6 new); new dep `python-multipart` in requirements.
+- **Submission kit ready in `docs/submission/`**: pitch deck PDF (11 slides,
+  1.1 MB, real product screenshots incl. Marathi dashboard) + editable PPTX +
+  form texts (944/1,000 and 968/1,024 chars) + demo-video script + checklist
+  README. Outstanding human steps: make repo public, record the video, timed
+  rehearsal.
+
+## Progress Notes (July 3, evening)
 
 Checkboxes reflect ATTESTED work only — a step stays unchecked if it could not
 be verified yet, even when the code is written. Current state:
@@ -1400,13 +1414,13 @@ gcloud run deploy smart-health --source . --region asia-south1 \
 ## Phase 5 — Days 5–6: Demo, Pitch, Submit
 
 ### Task 5.1: Backup demo video (Day 5)
-- [ ] Record a 3–5 min screen capture with narration: problem → operator enters stock → live alert on admin dashboard → AI briefing → redistribution recommendation → underperformance flag → language toggle. This is insurance if the live demo fails.
+- [ ] Record a 3–5 min screen capture with narration: problem → operator enters stock → live alert on admin dashboard → AI briefing → redistribution recommendation → underperformance flag → language toggle. This is insurance if the live demo fails. *(Shot list + narration ready: `docs/submission/demo-video-script.md` — recording is a human step.)*
 
 ### Task 5.2: Pitch deck (Day 5)
-- [ ] 10–12 slides: Problem (MP's PHC gap) → Solution → **live demo screenshots** → AI architecture (real algorithms + Gemini as communication layer) → Deployability (PHC operator now, e-Aushadhi/HMIS/ABDM integration + Vertex AI at scale) → Impact (Pune Rural → district → state; patients served) → Tech stack (Google Cloud) → Team. Export PDF ≤5MB.
+- [x] 10–12 slides: Problem (MP's PHC gap) → Solution → **live demo screenshots** → AI architecture (real algorithms + Gemini as communication layer) → Deployability (PHC operator now, e-Aushadhi/HMIS/ABDM integration + Vertex AI at scale) → Impact (Pune Rural → district → state; patients served) → Tech stack (Google Cloud) → Team. Export PDF ≤5MB. *(11 slides, 1.1 MB: `docs/submission/Smart-Health-Pitch-Deck.pdf`; editable PPTX alongside.)*
 
 ### Task 5.3: Submission text (Day 5)
-- [ ] Solution explanation ≤1000 chars (draft, trim). Technologies-used ≤1024 chars (FastAPI, React, Firestore, Firebase Auth, Cloud Run, Gemini 2.5 Flash, Recharts).
+- [x] Solution explanation ≤1000 chars (draft, trim). Technologies-used ≤1024 chars (FastAPI, React, Firestore, Firebase Auth, Cloud Run, Gemini 2.5 Flash, Recharts). *(944 and 968 chars: `docs/submission/*.txt`.)*
 - [ ] Timed rehearsal < 5 min.
 
 ### Task 5.4: Submit (Day 6)

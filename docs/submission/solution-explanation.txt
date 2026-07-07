@@ -1,0 +1,5 @@
+District health officials manage 30+ rural health centres through paper registers and phone calls — stock-outs surface only after patients are turned away. Smart Health is a real-time district command centre plus a 60-second daily-report app for PHC operators, in English, Hindi and Marathi.
+
+Operators log footfall, staff attendance, medicine stock, beds and diagnostics from a phone — or photograph a restock invoice and Gemini fills the stock form. Every write instantly recomputes stock-out forecasts (recency-weighted EWMA), a composite performance score and alerts; the dashboard updates live.
+
+AI where it helps, never where it risks: algorithms decide, Gemini explains — district briefings, underperformance explanations and transfer advice in the official's own language. A redistribution engine matches surplus centres to deficit ones before stock-outs hit. New PHCs get safe thresholds from one question: expected patients per day.

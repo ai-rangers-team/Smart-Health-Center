@@ -1,0 +1,9 @@
+Google Cloud & Firebase: Cloud Run (asia-south1), Firestore (real-time onSnapshot listeners + offline persistence), Firebase Authentication (Google Sign-In with custom-claim RBAC: district admin / PHC operator), Firestore security rules, Secret Manager.
+
+AI: Gemini 2.5 Flash via the google-genai SDK — multilingual district briefings, underperformance explanations, transfer recommendations, and structured-output invoice OCR (photo/PDF to stock quantities). Deterministic core so AI never gates a write: recency-weighted EWMA stock-out forecasting, composite performance scoring, greedy surplus-to-deficit redistribution matching.
+
+Backend: FastAPI (Python 3.12), Pydantic v2, Firebase Admin SDK, SlowAPI rate limiting, pytest (60 tests).
+
+Frontend: React 18 + Vite PWA, Tailwind CSS design system (built with Claude Design), Recharts, trilingual i18n (EN/HI/MR).
+
+DevOps: GitHub Actions CI/CD with Workload Identity Federation (keyless deploys), Docker multi-stage build.
