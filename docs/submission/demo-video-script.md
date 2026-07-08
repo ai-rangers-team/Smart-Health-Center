@@ -88,7 +88,7 @@ of paperwork."
 
 ## Recording checklist
 - [ ] `scripts/seed --reset` run, dashboard shows the 6-centre Pune Rural scenario
-- [ ] Sample invoice photo on the phone/desktop for Scene 3 (docs/submission/assets — add one)
+- [ ] Sample invoice ready: `docs/submission/assets/sample-invoice.png` (quantities tuned so saving clears Mulshi's Paracetamol critical on camera)
 - [ ] Gemini quota fresh (standby API key ready; avoid rehearsing briefings on the prod key)
 - [ ] One full timed rehearsal < 5:00
 - [ ] Export ≤ 1080p MP4; audio clear, no background noise
