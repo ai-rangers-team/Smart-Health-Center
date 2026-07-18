@@ -96,6 +96,39 @@ export function previewDoc(path) {
 }
 
 export const PREVIEW_API = {
+  outbreaks: [
+    { signal: "ors", indication: "diarrhoeal illness", centres: ["PHC Mulshi", "PHC Haveli"], centre_count: 2, peak_ratio: 2.1, severity: "medium" },
+  ],
+  impact: {
+    stockouts_flagged_early: 3,
+    avg_lead_time_days: 3.3,
+    units_redistributed: 350,
+    patients_protected: 900,
+    rupees_saved: 340,
+  },
+  publicCentre: {
+    name: "PHC Mulshi",
+    type: "PHC",
+    block: "Mulshi Taluka",
+    doctor_present: true,
+    beds: { available: 4, total: 12 },
+    medicines: [
+      { id: "paracetamol", name: "Paracetamol 500mg", status: "low" },
+      { id: "ors", name: "ORS Sachets", status: "available" },
+      { id: "ifa", name: "Iron + Folic Acid", status: "available" },
+      { id: "amoxicillin", name: "Amoxicillin 250mg", status: "available" },
+      { id: "metformin", name: "Metformin 500mg", status: "available" },
+    ],
+    tests: { malaria: true, tb: true, pregnancy: true },
+  },
+  voice: {
+    transcript: "पॅरासिटामॉल एकशे वीस, ओआरएस पंचेचाळीस",
+    items: [
+      { medicine_id: "paracetamol", medicine_name: "Paracetamol 500mg", unit: "tablets", proposed_stock: 120, confidence: "high" },
+      { medicine_id: "ors", medicine_name: "ORS Sachets", unit: "sachets", proposed_stock: 45, confidence: "high" },
+    ],
+    unmatched: [],
+  },
   briefing: {
     en: "Two centres face critical medicine stock-outs within 3 days. PHC Mulshi needs Paracetamol and PHC Haveli needs ORS urgently. A transfer from Pune Rural CHC is recommended for both.",
     hi: "दो केंद्रों में 3 दिनों के भीतर गंभीर दवा समाप्ति का खतरा है। PHC मुळशी को पैरासिटामोल और PHC हवेली को ORS की तत्काल आवश्यकता है। दोनों के लिए पुणे ग्रामीण CHC से स्थानांतरण की सिफारिश की जाती है।",

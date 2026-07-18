@@ -10,6 +10,9 @@ if (PREVIEW) {
   // Dev-only: canned AI responses so screens render without the backend.
   const lang = (url) => new URLSearchParams(url.split("?")[1] || "").get("lang") || "mr";
   api.get = async (url) => {
+    if (url.includes("/api/ai/impact/")) return PREVIEW_API.impact;
+    if (url.includes("/api/ai/outbreak/")) return { outbreaks: PREVIEW_API.outbreaks };
+    if (url.includes("/api/public/centre/")) return PREVIEW_API.publicCentre;
     if (url.includes("district-briefing")) return { briefing: PREVIEW_API.briefing[lang(url)] };
     if (url.includes("/api/ai/forecast/"))
       return {
@@ -19,10 +22,29 @@ if (PREVIEW) {
       };
     return {};
   };
-  api.post = async (url) =>
-    url.includes("explain-underperformance")
-      ? { explanation: PREVIEW_API.explanation[lang(url)] }
-      : { ok: true };
+  api.post = async (url, body) => {
+    if (url.includes("explain-underperformance"))
+      return { explanation: PREVIEW_API.explanation[lang(url)] };
+    if (url.includes("/stock/voice")) return PREVIEW_API.voice;
+    if (url.includes("/api/sms/report") || url.includes("/api/sms/parse")) {
+      // Lightweight offline mirror of the backend alias parser (demo centre only).
+      const ALIAS = {
+        para: "Paracetamol 500mg", pcm: "Paracetamol 500mg", pc: "Paracetamol 500mg",
+        ors: "ORS Sachets", ifa: "Iron + Folic Acid", iron: "Iron + Folic Acid",
+        met: "Metformin 500mg", metf: "Metformin 500mg",
+      };
+      const applied = [], unmatched = [], seen = new Set();
+      for (const [, w, n] of (body?.text || "").matchAll(/([A-Za-z]+)\s*[:=]?\s*(\d+)/g)) {
+        const name = ALIAS[w.toLowerCase()];
+        if (!name) { unmatched.push(w); continue; }
+        if (seen.has(name)) continue;
+        seen.add(name);
+        applied.push({ medicine_name: name, current_stock: Number(n) });
+      }
+      return { centre_name: "PHC Mulshi", applied, updates: applied, unmatched };
+    }
+    return { ok: true };
+  };
   api.patch = async () => ({ ok: true });
 }
 

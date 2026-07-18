@@ -10,6 +10,14 @@ import Typewriter from "../components/Typewriter";
 
 const STATUS_ORDER = { critical: 0, warning: 1, under_resourced: 2, underperforming: 2, operational: 3, healthy: 3 };
 
+// Map the backend's English indication strings to localizable label keys.
+const INDICATION_KEY = {
+  "diarrhoeal illness": "ind_diarrhoeal",
+  "febrile illness": "ind_febrile",
+  "respiratory/bacterial infection": "ind_respiratory",
+  "patient footfall": "ind_footfall",
+};
+
 function statusKey(c) {
   return (c.status || "operational").toLowerCase();
 }
@@ -92,6 +100,33 @@ export default function Dashboard() {
       clearTimeout(timer);
     };
   }, [did, lang]);
+
+  // Impact ledger — deterministic headline numbers (no Gemini). Refetched when the
+  // alert set changes, which is a good proxy for "an operator just reported new stock".
+  const [impact, setImpact] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get(`/api/ai/impact/${did}`)
+      .then((d) => !cancelled && setImpact(d))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [did, alerts.length]);
+
+  // Outbreak early-warning — clustered consumption/footfall surges (no Gemini).
+  const [outbreaks, setOutbreaks] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get(`/api/ai/outbreak/${did}`)
+      .then((d) => !cancelled && setOutbreaks(d.outbreaks || []))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [did, alerts.length]);
 
   const [acked, setAcked] = useState({});
   const acknowledge = async (id) => {
@@ -204,6 +239,77 @@ export default function Dashboard() {
             )}
           </section>
         )}
+
+        {outbreaks.length > 0 && (
+          <section className="rounded-card border border-status-warning/40 bg-status-warning-soft p-5">
+            <div className="flex items-center gap-2">
+              <span className="text-lg" aria-hidden>
+                ⚠
+              </span>
+              <h2 className="text-lg font-semibold text-status-warning-deep">
+                {t("outbreak_banner_title")}
+              </h2>
+            </div>
+            <ul className="mt-3 space-y-3">
+              {outbreaks.map((o, i) => {
+                const key = INDICATION_KEY[o.indication];
+                const indText = key ? t(key) : o.indication;
+                return (
+                  <li key={i}>
+                    <p className="text-sm font-semibold text-status-warning-deep">
+                      {t("outbreak_line", {
+                        indication: indText,
+                        n: o.centre_count,
+                        ratio: o.peak_ratio,
+                      })}
+                    </p>
+                    <p className="text-sm text-status-warning-deep/80">
+                      {t("outbreak_centres_label")}: {o.centres.join(", ")}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-3 text-xs text-status-warning-deep/70">{t("outbreak_hint")}</p>
+          </section>
+        )}
+
+        {impact &&
+          (impact.patients_protected > 0 || impact.stockouts_flagged_early > 0) && (
+            <section className="rounded-card border border-status-healthy/30 bg-status-healthy-soft p-6">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center rounded-chip bg-brand px-2.5 py-1 text-xs font-bold tracking-wide text-white">
+                  AI
+                </span>
+                <h2 className="text-lg font-semibold">{t("impact_ledger_title")}</h2>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <ImpactTile
+                  value={impact.patients_protected.toLocaleString("en-IN")}
+                  label={t("impact_patients_protected")}
+                  sub={`${impact.units_redistributed.toLocaleString("en-IN")} ${t(
+                    "impact_units_sub"
+                  )}`}
+                />
+                <ImpactTile
+                  value={`₹${impact.rupees_saved.toLocaleString("en-IN")}`}
+                  label={t("impact_rupees_saved")}
+                />
+                <ImpactTile
+                  value={impact.stockouts_flagged_early}
+                  label={t("impact_flagged_early")}
+                  sub={t("impact_lead_time_sub", { d: impact.avg_lead_time_days })}
+                />
+                <ImpactTile
+                  value={impact.units_redistributed.toLocaleString("en-IN")}
+                  label={t("impact_units_moved")}
+                />
+              </div>
+              <p className="mt-4 text-xs text-ink-faint">
+                {t("impact_estimate_note", { n: centres.length })}
+              </p>
+            </section>
+          )}
 
         {(() => {
           const so = alerts.filter(
@@ -354,6 +460,16 @@ export default function Dashboard() {
           </div>
         </section>
       </main>
+    </div>
+  );
+}
+
+function ImpactTile({ label, value, sub }) {
+  return (
+    <div className="rounded-tile border border-status-healthy/20 bg-surface/70 p-5">
+      <p className="tabular text-3xl font-bold text-status-healthy-deep">{value}</p>
+      <p className="mt-1 text-sm font-medium text-ink">{label}</p>
+      {sub && <p className="mt-0.5 text-xs text-ink-muted">{sub}</p>}
     </div>
   );
 }
