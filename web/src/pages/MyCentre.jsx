@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../hooks/useAuth";
 import { useCollection, useDoc } from "../hooks/useFirestore";
@@ -46,6 +46,16 @@ export default function MyCentre() {
   const [extracting, setExtracting] = useState(false);
   const [invoiceReview, setInvoiceReview] = useState(null); // {unmatched: [names]}
   const [invoiceError, setInvoiceError] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceReview, setVoiceReview] = useState(null); // {transcript, unmatched}
+  const [voiceError, setVoiceError] = useState("");
+  const mediaRef = useRef(null); // { recorder, stream }
+  const voiceSupported =
+    typeof navigator !== "undefined" &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    typeof window !== "undefined" &&
+    typeof window.MediaRecorder !== "undefined";
 
   useEffect(() => {
     if (bedsDoc) {
@@ -134,6 +144,55 @@ export default function MyCentre() {
     } finally {
       setExtracting(false);
     }
+  }
+
+  // Voice stock entry: record → send audio → Gemini transcribes + maps to catalog →
+  // pre-fill the steppers for review (never writes; operator still taps Save).
+  async function sendVoice(blob) {
+    if (!centreId) return;
+    setVoiceBusy(true);
+    try {
+      const form = new FormData();
+      const ext = ((blob.type.split("/")[1] || "webm").split(";")[0]) || "webm";
+      form.append("file", blob, `report.${ext}`);
+      const res = await api.post(`/api/centres/${centreId}/stock/voice?lang=${lang}`, form);
+      setStock((s) => {
+        const next = { ...s };
+        for (const item of res.items || []) next[item.medicine_id] = item.proposed_stock;
+        return next;
+      });
+      setVoiceReview({ transcript: res.transcript || "", unmatched: res.unmatched || [] });
+    } catch (e) {
+      setVoiceError(e?.detail || e?.error || t("voice_failed"));
+    } finally {
+      setVoiceBusy(false);
+    }
+  }
+
+  async function startVoice() {
+    setVoiceError("");
+    setVoiceReview(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      recorder.onstop = () => {
+        stream.getTracks().forEach((tr) => tr.stop());
+        sendVoice(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }));
+      };
+      mediaRef.current = { recorder, stream };
+      recorder.start();
+      setRecording(true);
+    } catch {
+      setVoiceError(t("voice_mic_denied"));
+    }
+  }
+
+  function stopVoice() {
+    const m = mediaRef.current;
+    if (m?.recorder && m.recorder.state !== "inactive") m.recorder.stop();
+    setRecording(false);
   }
 
   return (
@@ -277,18 +336,58 @@ export default function MyCentre() {
                 <h2 className="font-semibold">{t("medicine_stock")}</h2>
                 <p className="text-sm text-ink-muted">{t("how_much_left")}</p>
               </div>
-              <label className="shrink-0 cursor-pointer rounded-action border border-line-control px-3 py-2 text-xs font-semibold text-ink hover:bg-line-light">
-                {extracting ? t("invoice_extracting") : t("scan_invoice")}
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  capture="environment"
-                  disabled={extracting}
-                  onChange={handleInvoiceFile}
-                  className="hidden"
-                />
-              </label>
+              <div className="flex shrink-0 items-center gap-2">
+                {voiceSupported && (
+                  <button
+                    type="button"
+                    onClick={recording ? stopVoice : startVoice}
+                    disabled={voiceBusy}
+                    className={`rounded-action border px-3 py-2 text-xs font-semibold disabled:opacity-60 ${
+                      recording
+                        ? "animate-pulse border-status-critical bg-status-critical-soft text-status-critical"
+                        : "border-line-control text-ink hover:bg-line-light"
+                    }`}
+                  >
+                    {voiceBusy
+                      ? t("voice_reading")
+                      : recording
+                      ? `● ${t("voice_listening")}`
+                      : `🎙 ${t("voice_report")}`}
+                  </button>
+                )}
+                <label className="cursor-pointer rounded-action border border-line-control px-3 py-2 text-xs font-semibold text-ink hover:bg-line-light">
+                  {extracting ? t("invoice_extracting") : t("scan_invoice")}
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    capture="environment"
+                    disabled={extracting}
+                    onChange={handleInvoiceFile}
+                    className="hidden"
+                  />
+                </label>
+              </div>
             </div>
+            {voiceReview && (
+              <div className="mt-3 rounded-action bg-status-healthy-soft p-3 text-sm text-status-healthy-deep">
+                <p className="font-medium">{t("voice_review")}</p>
+                {voiceReview.transcript && (
+                  <p className="mt-1 italic text-status-healthy-deep/80">
+                    {t("voice_heard", { text: voiceReview.transcript })}
+                  </p>
+                )}
+                {voiceReview.unmatched.length > 0 && (
+                  <p className="mt-1 text-status-healthy-deep/80">
+                    {t("voice_unmatched", { names: voiceReview.unmatched.join(", ") })}
+                  </p>
+                )}
+              </div>
+            )}
+            {voiceError && (
+              <p className="mt-3 rounded-action bg-status-critical-soft p-3 text-sm font-medium text-status-critical">
+                {voiceError}
+              </p>
+            )}
             {invoiceReview && (
               <div className="mt-3 rounded-action bg-status-healthy-soft p-3 text-sm text-status-healthy-deep">
                 <p className="font-medium">{t("invoice_extracted_review")}</p>

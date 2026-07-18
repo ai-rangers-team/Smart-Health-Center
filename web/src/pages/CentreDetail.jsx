@@ -16,6 +16,7 @@ import { api } from "../api";
 import { useAuth } from "../hooks/useAuth";
 import { useCollection, useDoc } from "../hooks/useFirestore";
 import { useLang } from "../i18n/translations";
+import QRCode from "qrcode";
 import { DepletionBar, LanguageSwitch, StatusBadge } from "../components/ui";
 import Typewriter from "../components/Typewriter";
 
@@ -118,6 +119,8 @@ export default function CentreDetail() {
             </p>
           </section>
         )}
+
+        <PublicQR centreId={centreId} />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="rounded-card border border-line bg-surface p-6">
@@ -298,5 +301,41 @@ export default function CentreDetail() {
         )}
       </main>
     </div>
+  );
+}
+
+/** Citizen public-status QR (points to /p/:centreId). Encoded locally — no network. */
+function PublicQR({ centreId }) {
+  const { t } = useLang();
+  const [src, setSrc] = useState("");
+  const url = `${window.location.origin}/p/${centreId}`;
+  useEffect(() => {
+    QRCode.toDataURL(url, {
+      width: 160,
+      margin: 1,
+      color: { dark: "#0F2E27", light: "#FFFFFF" },
+    })
+      .then(setSrc)
+      .catch(() => setSrc(""));
+  }, [url]);
+
+  return (
+    <section className="flex items-center gap-5 rounded-card border border-line bg-surface p-6">
+      {src && (
+        <img src={src} alt="" width={120} height={120} className="rounded-tile border border-line" />
+      )}
+      <div>
+        <h2 className="text-base font-semibold">{t("public_qr_title")}</h2>
+        <p className="mt-1 text-sm text-ink-muted">{t("public_qr_hint")}</p>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-block text-sm font-semibold text-brand hover:text-brand-deep"
+        >
+          {t("public_open_page")} ↗
+        </a>
+      </div>
+    </section>
   );
 }
