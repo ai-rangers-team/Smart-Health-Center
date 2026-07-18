@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from app.config import settings
-from app.routers import ai, alerts, centres, dashboard, operator, seed
+from app.routers import ai, alerts, centres, dashboard, operator, public, seed, sms
 
 # 60 req/min per client IP across the API — enough for normal dashboard use,
 # blocks abuse of the Gemini-backed endpoints.
@@ -37,6 +37,8 @@ def create_app() -> FastAPI:
     app.include_router(alerts.router)
     app.include_router(ai.router)
     app.include_router(ai.recs_router)
+    app.include_router(public.router)
+    app.include_router(sms.router)
     app.include_router(seed.router)
 
     if os.path.isdir("static"):
