@@ -43,7 +43,9 @@ CENTRES = [
         "footfall_base": 82, "tests_off": [],
         "stock": {
             "paracetamol": (120, [38, 41, 40, 42, 39, 40, 41]),   # ~3 days -> CRITICAL
-            "ors": (340, [24, 25, 23, 25, 24, 25, 24]),
+            # Last day spikes ~2x -> feeds the outbreak detector (ORS = diarrhoeal
+            # marker). Ample stock (340) keeps days_remaining safe, so no false alert.
+            "ors": (340, [24, 25, 23, 25, 24, 25, 52]),
             "ifa": (450, [55, 57, 56, 55, 57, 56, 56]),
             "amoxicillin": (300, [24, 26, 25, 25, 24, 26, 25]),
             "metformin": (500, [27, 29, 28, 28, 27, 29, 28]),
@@ -67,7 +69,9 @@ CENTRES = [
         "footfall_base": 70, "tests_off": [],
         "stock": {
             "paracetamol": (500, [30, 31, 30, 31, 30, 31, 30]),
-            "ors": (300, [22, 23, 22, 23, 22, 23, 22]),
+            # Second centre of the ORS surge -> two centres = a cluster the
+            # outbreak detector flags as a possible diarrhoeal cluster.
+            "ors": (300, [22, 23, 22, 23, 22, 23, 48]),
             "ifa": (450, [88, 92, 90, 89, 91, 90, 90]),            # ~5 days -> HIGH
             "amoxicillin": (280, [18, 19, 18, 19, 18, 19, 18]),
             "metformin": (400, [21, 22, 21, 22, 21, 22, 21]),

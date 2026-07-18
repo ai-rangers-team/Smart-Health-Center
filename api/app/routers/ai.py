@@ -13,6 +13,8 @@ from app.deps import get_current_user
 from app.models.schemas import ok
 from app.services import gemini
 from app.services.forecasting import forecast_footfall, forecast_stockout
+from app.services.impact import compute_impact
+from app.services.outbreak import MARKERS, detect_outbreaks
 from app.services.recompute import recompute_centre
 from app.services.redistribution import compute_redistribution
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -85,13 +87,16 @@ def district_briefing(district_id: str, lang: str = Query("mr"), user=Depends(ge
     return ok({"briefing": stored, "cached": False, "stale": bool(stored)})
 
 
-@router.post("/redistribution/{district_id}")
-def redistribution(district_id: str, lang: str = Query("mr"), user=Depends(get_current_user)):
+def _district_stock(district_id: str) -> tuple[list[dict], list[dict]]:
+    """Assemble every centre's stock (in the shape the redistribution engine wants)
+    plus the flat list of per-medicine forecasts across the district. Shared by the
+    redistribution and impact endpoints so both read the same numbers."""
     db = _db()
-    centres = []
+    centres, all_forecasts = [], []
     for c in db.collection("centres").where(filter=FieldFilter("district_id", "==", district_id)).stream():
         stock = {}
         for m in _stock_forecasts(c.id):
+            all_forecasts.append(m)
             stock[m["id"]] = {
                 "medicine_name": m.get("medicine_name") or m["id"],
                 "current_stock": m.get("current_stock", 0),
@@ -100,7 +105,42 @@ def redistribution(district_id: str, lang: str = Query("mr"), user=Depends(get_c
                 "days_remaining": m["days_remaining"],
             }
         centres.append({"id": c.id, "name": c.to_dict().get("name"), "stock": stock})
+    return centres, all_forecasts
 
+
+@router.get("/outbreak/{district_id}")
+def outbreak(district_id: str, user=Depends(get_current_user)):
+    """Possible disease-cluster early warning — consumption/footfall surges across
+    multiple centres (deterministic, no Gemini). Empty list means no cluster signal."""
+    db = _db()
+    centres = []
+    for c in db.collection("centres").where(filter=FieldFilter("district_id", "==", district_id)).stream():
+        foot_docs = list(c.reference.collection("footfall")
+                         .order_by("date", direction=firestore.Query.DESCENDING).limit(10).stream())
+        footfall = [d.to_dict().get("count", 0) for d in foot_docs][::-1]  # oldest -> newest
+        consumption = {}
+        for s in c.reference.collection("stock").stream():
+            m = s.to_dict()
+            if s.id in MARKERS:
+                consumption[s.id] = list(m.get("consumption_history") or [])
+        centres.append({"name": c.to_dict().get("name"), "footfall": footfall,
+                        "consumption": consumption})
+    return ok({"outbreaks": detect_outbreaks(centres)})
+
+
+@router.get("/impact/{district_id}")
+def impact(district_id: str, user=Depends(get_current_user)):
+    """District impact ledger — deterministic headline metrics (no Gemini): shortages
+    caught early, lead time bought, and the redistribution opportunity in patients/₹."""
+    centres, forecasts = _district_stock(district_id)
+    recs = compute_redistribution(centres)
+    return ok(compute_impact(forecasts, recs))
+
+
+@router.post("/redistribution/{district_id}")
+def redistribution(district_id: str, lang: str = Query("mr"), user=Depends(get_current_user)):
+    db = _db()
+    centres, _ = _district_stock(district_id)
     recs = compute_redistribution(centres)
 
     # Each generated plan supersedes the previous pending one — without this,

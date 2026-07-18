@@ -12,14 +12,28 @@ _LANG = {"en": "English", "hi": "Hindi", "mr": "Marathi"}
 
 _client = None
 
+# Cloud-platform scope so the Firebase service account can call the Vertex AI API.
+_VERTEX_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
+
 
 def _get_client():
-    # Lazy: constructing genai.Client() validates the API key immediately, which
+    # Lazy: constructing genai.Client() resolves credentials immediately, which
     # would crash any import of this module (and therefore app.main) before
-    # GEMINI_API_KEY is configured — e.g. on a fresh checkout or in CI.
+    # credentials are configured — e.g. on a fresh checkout or in CI.
+    #
+    # Auth: a GEMINI_API_KEY (Developer API) takes precedence if set; otherwise
+    # Gemini runs on Vertex AI using the SAME service account as Firebase
+    # (FIREBASE_CREDENTIALS_PATH), so every AI feature shares one credential.
     global _client
     if _client is None:
-        _client = genai.Client(api_key=settings.gemini_api_key)
+        if settings.gemini_api_key:
+            _client = genai.Client(api_key=settings.gemini_api_key)
+        else:
+            from google.oauth2 import service_account
+            creds = service_account.Credentials.from_service_account_file(
+                settings.firebase_credentials_path, scopes=_VERTEX_SCOPES)
+            _client = genai.Client(vertexai=True, project=creds.project_id,
+                                   location=settings.gemini_location, credentials=creds)
     return _client
 
 
