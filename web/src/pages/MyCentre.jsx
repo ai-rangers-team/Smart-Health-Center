@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { where } from "firebase/firestore";
 import { api } from "../api";
 import { useAuth } from "../hooks/useAuth";
 import { useCollection, useDoc } from "../hooks/useFirestore";
@@ -14,12 +15,20 @@ const TESTS = ["malaria", "tb", "pregnancy", "diabetes", "hiv"];
  * alerts on write (the live demo moment).
  */
 export default function MyCentre() {
-  const { centreId, signOut } = useAuth();
+  const { centreId, signOut, user } = useAuth();
   const { t, lang, local, hasChosenLang, setLang } = useLang();
   const online = useOnline();
 
   const centre = useDoc(`centres/${centreId}`);
   const stockRows = useCollection(`centres/${centreId}/stock`);
+  // Transfers headed to this centre awaiting a receipt confirmation (anti-fraud L4).
+  const incoming = useCollection(
+    "recommendations",
+    [where("to_centre_id", "==", centreId)],
+    [centreId]
+  ).filter((r) => r.to_centre_id === centreId && r.status === "pending");
+  const [receiptQty, setReceiptQty] = useState({});
+  const [confirming, setConfirming] = useState({});
   const bedsDoc = useDoc(`centres/${centreId}/beds/current`);
   const testsDoc = useDoc(`centres/${centreId}/tests/current`);
   // Today's already-reported values (UTC date key, same as the backend writes)
@@ -195,18 +204,39 @@ export default function MyCentre() {
     setRecording(false);
   }
 
+  async function confirmReceipt(rec) {
+    const qty = receiptQty[rec.id] ?? rec.quantity;
+    setConfirming((c) => ({ ...c, [rec.id]: true }));
+    try {
+      await api.post(`/api/recommendations/${rec.id}/confirm-receipt`, { received_qty: qty });
+      // The rec leaves the pending list via the live snapshot once its status changes.
+    } catch {
+      setConfirming((c) => ({ ...c, [rec.id]: false }));
+    }
+  }
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-phone flex-col bg-canvas md:max-w-4xl">
       <header className="bg-brand-deep px-5 pb-4 pt-3 text-white md:rounded-b-card">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <LanguageSwitch onDark />
-          <span
-            className={`text-xs font-medium ${
-              online ? "text-ondark-soft" : "text-status-warning"
-            }`}
-          >
-            {online ? "●" : `○ ${t("no_network")}`}
-          </span>
+          <div className="flex items-center gap-3">
+            {user?.displayName && (
+              <div className="text-right">
+                <p className="max-w-[10rem] truncate text-sm font-semibold text-white">
+                  {user.displayName}
+                </p>
+                <p className="text-xs text-ondark-subtle">{t("health_worker")}</p>
+              </div>
+            )}
+            <span
+              className={`text-xs font-medium ${
+                online ? "text-ondark-soft" : "text-status-warning"
+              }`}
+            >
+              {online ? "●" : `○ ${t("no_network")}`}
+            </span>
+          </div>
         </div>
         <div className="mt-2 flex items-end justify-between">
           <div>
@@ -266,6 +296,36 @@ export default function MyCentre() {
         {error && (
           <section className="mb-4 rounded-card bg-status-critical-soft p-4 text-sm font-medium text-status-critical">
             {error}
+          </section>
+        )}
+
+        {incoming.length > 0 && (
+          <section className="mb-4 rounded-card border border-brand/30 bg-surface p-5">
+            <h2 className="font-semibold">{t("incoming_title")}</h2>
+            <p className="text-sm text-ink-muted">{t("incoming_howmany")}</p>
+            <ul className="mt-4 space-y-4">
+              {incoming.map((r) => (
+                <li key={r.id} className="border-b border-line-light pb-4 last:border-0 last:pb-0">
+                  <p className="text-sm font-medium">
+                    {r.quantity} × {local("meds", r.medicine)}
+                  </p>
+                  <p className="text-xs text-ink-muted">{t("incoming_from", { from: r.from_centre })}</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <Stepper
+                      value={receiptQty[r.id] ?? r.quantity}
+                      onChange={(v) => setReceiptQty((s) => ({ ...s, [r.id]: v }))}
+                    />
+                    <button
+                      onClick={() => confirmReceipt(r)}
+                      disabled={confirming[r.id]}
+                      className="shrink-0 rounded-action bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-deep disabled:opacity-60"
+                    >
+                      {t("incoming_confirm")}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

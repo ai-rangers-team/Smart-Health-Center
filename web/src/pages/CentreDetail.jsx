@@ -100,9 +100,12 @@ export default function CentreDetail() {
             </p>
           </div>
           <StatusBadge status={centre.status || "healthy"} className="mt-1.5">
-            {isUnder
-              ? `${t("underperforming")} · ${centre.performance_score ?? "—"}/100`
-              : t(centre.status === "critical" ? "critical" : "healthy")}
+            {(isUnder
+              ? t("underperforming")
+              : t(centre.status === "critical" ? "critical" : "healthy")) +
+              (centre.performance_score != null
+                ? ` · ${centre.performance_score}/100`
+                : "")}
           </StatusBadge>
         </div>
 

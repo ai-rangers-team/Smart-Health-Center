@@ -29,11 +29,14 @@ export const ALERTS = [
   { id: "a2", district_id: "pune_rural", centre_id: "phc_haveli", centre_name: "PHC Haveli", type: "STOCKOUT_CRITICAL", severity: "critical", medicine_name: "ORS Sachets", days_remaining: 2, message: "ORS Sachets will stock out in 2 days — reorder now", resolved: false },
   { id: "a3", district_id: "pune_rural", centre_id: "phc_ambegaon", centre_name: "PHC Ambegaon", type: "STOCKOUT_WARNING", severity: "high", medicine_name: "Iron + Folic Acid", days_remaining: 5, message: "Iron + Folic Acid low: 5 days remaining", resolved: false },
   { id: "a4", district_id: "pune_rural", centre_id: "phc_velhe", centre_name: "PHC Velhe", type: "UNDERPERFORMANCE", severity: "medium", message: "PHC Velhe flagged: score 38/100", resolved: false },
+  { id: "a5", district_id: "pune_rural", centre_id: "phc_velhe", centre_name: "PHC Velhe", type: "DATA_INTEGRITY", severity: "medium", check_type: "CONSUMPTION_WITHOUT_PATIENTS", medicine_name: "Paracetamol 500mg", message: "Paracetamol 500mg leaving at 4.8 units per patient — far above normal; verify dispensing vs diversion", resolved: false },
+  { id: "a6", district_id: "pune_rural", centre_id: "phc_velhe", centre_name: "PHC Velhe", type: "CITIZEN_DISPUTE", severity: "high", check_type: "DOCTOR_ABSENCE", message: "4 citizens report no doctor present today, but the centre reports a doctor on duty", resolved: false },
 ];
 
 export const RECOMMENDATIONS = [
-  { id: "r1", district_id: "pune_rural", type: "REDISTRIBUTION", from_centre: "Pune Rural CHC", to_centre: "PHC Mulshi", medicine: "Paracetamol 500mg", quantity: 200, urgency: "critical", status: "pending", gemini_message: "Move 200 Paracetamol tablets from Pune Rural CHC to PHC Mulshi — 3 days of stock left." },
-  { id: "r2", district_id: "pune_rural", type: "REDISTRIBUTION", from_centre: "Pune Rural CHC", to_centre: "PHC Haveli", medicine: "ORS Sachets", quantity: 150, urgency: "critical", status: "pending", gemini_message: "Move 150 ORS sachets from Pune Rural CHC to PHC Haveli — 2 days left." },
+  { id: "r1", district_id: "pune_rural", type: "REDISTRIBUTION", from_centre: "Pune Rural CHC", from_centre_id: "chc_pune_rural", to_centre: "PHC Mulshi", to_centre_id: "phc_mulshi", medicine: "Paracetamol 500mg", medicine_id: "paracetamol", quantity: 200, urgency: "critical", status: "pending", gemini_message: "Move 200 Paracetamol tablets from Pune Rural CHC to PHC Mulshi — 3 days of stock left." },
+  { id: "r2", district_id: "pune_rural", type: "REDISTRIBUTION", from_centre: "Pune Rural CHC", from_centre_id: "chc_pune_rural", to_centre: "PHC Haveli", to_centre_id: "phc_haveli", medicine: "ORS Sachets", medicine_id: "ors", quantity: 150, urgency: "critical", status: "pending", gemini_message: "Move 150 ORS sachets from Pune Rural CHC to PHC Haveli — 2 days left." },
+  { id: "r3", district_id: "pune_rural", type: "REDISTRIBUTION", from_centre: "Pune Rural CHC", from_centre_id: "chc_pune_rural", to_centre: "PHC Ambegaon", to_centre_id: "phc_ambegaon", medicine: "Iron + Folic Acid", medicine_id: "ifa", quantity: 300, urgency: "high", status: "disputed", received_qty: 210, shortfall: 90, gemini_message: "" },
 ];
 
 const STOCK = {

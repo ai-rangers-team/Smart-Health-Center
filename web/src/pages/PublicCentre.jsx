@@ -19,6 +19,21 @@ export default function PublicCentre() {
   const { centreId } = useParams();
   const { t, local } = useLang();
   const [c, setC] = useState(undefined); // undefined = loading, null = not found
+  const [fb, setFb] = useState({ doctor: null, medicine: null });
+  const [fbDone, setFbDone] = useState(false);
+
+  async function submitFeedback() {
+    if (fb.doctor === null || fb.medicine === null) return;
+    try {
+      await api.post(`/api/public/centre/${centreId}/feedback`, {
+        doctor_present: fb.doctor,
+        medicine_available: fb.medicine,
+      });
+    } catch {
+      /* best-effort — still thank the citizen */
+    }
+    setFbDone(true);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -128,10 +143,67 @@ export default function PublicCentre() {
               </ul>
             </section>
 
+            <section className="mt-8 rounded-card border border-line bg-surface p-5">
+              {fbDone ? (
+                <p className="py-2 text-center text-sm font-medium text-status-healthy-deep">
+                  ✓ {t("feedback_thanks")}
+                </p>
+              ) : (
+                <>
+                  <h2 className="font-semibold">{t("feedback_title")}</h2>
+                  <div className="mt-4 space-y-4">
+                    <YesNo
+                      label={t("feedback_doctor_q")}
+                      value={fb.doctor}
+                      onChange={(v) => setFb((s) => ({ ...s, doctor: v }))}
+                      t={t}
+                    />
+                    <YesNo
+                      label={t("feedback_medicine_q")}
+                      value={fb.medicine}
+                      onChange={(v) => setFb((s) => ({ ...s, medicine: v }))}
+                      t={t}
+                    />
+                  </div>
+                  <button
+                    onClick={submitFeedback}
+                    disabled={fb.doctor === null || fb.medicine === null}
+                    className="mt-5 w-full rounded-action bg-brand py-3 text-sm font-semibold text-white hover:bg-brand-deep disabled:opacity-50"
+                  >
+                    {t("feedback_submit")}
+                  </button>
+                </>
+              )}
+            </section>
+
             <p className="mt-6 text-center text-xs text-ink-faint">{t("public_updated")}</p>
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+function YesNo({ label, value, onChange, t }) {
+  const btn = (v, text) =>
+    `flex-1 rounded-action border px-4 py-2 text-sm font-semibold ${
+      value === v
+        ? v
+          ? "border-status-healthy bg-status-healthy-soft text-status-healthy-deep"
+          : "border-status-critical bg-status-critical-soft text-status-critical"
+        : "border-line-control text-ink hover:bg-line-light"
+    }`;
+  return (
+    <div>
+      <p className="text-sm font-medium">{label}</p>
+      <div className="mt-2 flex gap-3">
+        <button className={btn(true)} onClick={() => onChange(true)}>
+          {t("feedback_yes")}
+        </button>
+        <button className={btn(false)} onClick={() => onChange(false)}>
+          {t("feedback_no")}
+        </button>
+      </div>
     </div>
   );
 }
