@@ -42,6 +42,12 @@ function alertText(a, t, local) {
       return t("alert_underperformance");
     case "TEST_UNAVAILABLE":
       return t("alert_test_unavailable", { test: local("tests", a.test_name || "") });
+    case "DATA_INTEGRITY":
+      // Descriptive detail (numbers/medicine) stays in the canonical message; only
+      // the "possible misreport" label is localized.
+      return `${t("alert_data_integrity")} — ${a.message}`;
+    case "CITIZEN_DISPUTE":
+      return `${t("alert_citizen_dispute")} — ${a.message}`;
     default:
       return a.message;
   }
@@ -175,6 +181,7 @@ export default function Dashboard() {
     (a, b) => (STATUS_ORDER[statusKey(a)] ?? 3) - (STATUS_ORDER[statusKey(b)] ?? 3)
   );
   const pending = recommendations.filter((r) => r.status === "pending" && !acked[r.id]);
+  const disputed = recommendations.filter((r) => r.status === "disputed");
 
   const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
   const activeAlerts = alerts
@@ -237,6 +244,34 @@ export default function Dashboard() {
                 <Typewriter text={briefing} />
               </p>
             )}
+          </section>
+        )}
+
+        {disputed.length > 0 && (
+          <section className="rounded-card border border-status-critical/40 bg-status-critical-soft p-5">
+            <div className="flex items-center gap-2">
+              <span className="text-lg" aria-hidden>
+                ⚑
+              </span>
+              <h2 className="text-lg font-semibold text-status-critical">
+                {t("transfer_discrepancy_title")}
+              </h2>
+            </div>
+            <ul className="mt-3 space-y-2">
+              {disputed.map((r) => (
+                <li key={r.id} className="text-sm font-medium text-status-critical">
+                  {t("transfer_discrepancy_line", {
+                    medicine: local("meds", r.medicine),
+                    sent: r.quantity,
+                    received: r.received_qty ?? 0,
+                    shortfall: r.shortfall ?? r.quantity - (r.received_qty ?? 0),
+                    from: r.from_centre,
+                    to: r.to_centre,
+                  })}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-status-critical/80">{t("transfer_discrepancy_hint")}</p>
           </section>
         )}
 
@@ -508,14 +543,18 @@ function CentreCard({ centre, alerts }) {
   const topAlert = alerts.find(
     (a) => a.centre_id === centre.id && a.days_remaining != null
   );
-  const badge =
+  // Show the composite performance score on every centre, not just flagged ones.
+  const scoreSuffix =
+    centre.performance_score != null ? ` · ${centre.performance_score}/100` : "";
+  const statusLabel =
     s === "critical"
       ? t("critical")
       : s === "warning"
       ? t("warning")
       : s === "under_resourced" || s === "underperforming"
-      ? `${t("underperforming")} · ${centre.performance_score ?? "—"}/100`
+      ? t("underperforming")
       : t("healthy");
+  const badge = `${statusLabel}${scoreSuffix}`;
 
   return (
     <Link
