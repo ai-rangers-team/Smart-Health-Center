@@ -9,6 +9,9 @@ __pycache__/
 node_modules/
 dist/
 
+# Built SPA copied into the API image at Docker build time (web/dist -> api/static)
+api/static/
+
 # Env / secrets
 .env
 *serviceaccount*.json
