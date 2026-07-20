@@ -8,8 +8,11 @@ scores, or any operator/staff identity. Served via the Admin SDK so Firestore's
 signed-in-only rules stay closed; this endpoint is the only public surface.
 """
 from fastapi import APIRouter, HTTPException
+from firebase_admin import firestore
+from pydantic import BaseModel
 
 from app.models.schemas import ok
+from app.services.citizen import refresh_disputes
 
 router = APIRouter(prefix="/api/public", tags=["public"])
 
@@ -69,3 +72,28 @@ def public_centre(centre_id: str):
         "medicines": medicines,
         "tests": {t: bool(tests.get(t, True)) for t in _ESSENTIAL_TESTS},
     })
+
+
+class CitizenFeedback(BaseModel):
+    doctor_present: bool
+    medicine_available: bool
+
+
+@router.post("/centre/{centre_id}/feedback")
+def submit_feedback(centre_id: str, body: CitizenFeedback):
+    """A citizen reports ground truth from their visit (coarse, no PII). Rate-limited
+    by the global SlowAPI limiter. Stored append-only; re-evaluates citizen disputes so
+    a contradiction with the operator's claim raises an alert for the district officer."""
+    cref = _db().collection("centres").document(centre_id)
+    doc = cref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Centre not found")
+    _db().collection("citizen_feedback").add({
+        "centre_id": centre_id,
+        "district_id": doc.to_dict().get("district_id"),
+        "doctor_present": body.doctor_present,
+        "medicine_available": body.medicine_available,
+        "at": firestore.SERVER_TIMESTAMP,
+    })
+    refresh_disputes(centre_id)
+    return ok({"received": True})

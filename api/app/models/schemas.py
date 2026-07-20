@@ -6,7 +6,13 @@ foundation — Devik should reconcile/extend rather than recreate.
 from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+# Data-integrity guardrails (anti-fraud layer 1): reject physically-impossible
+# inputs at the door so falsified numbers can't even enter as valid data. Plausible-
+# but-suspicious values still pass here and are caught by the anomaly engine instead.
+KNOWN_TESTS = {"malaria", "tb", "pregnancy", "diabetes", "hiv"}
+MAX_DAILY_FOOTFALL = 10000  # generous cap to catch fat-finger typos, not real volume
 
 
 def ok(data):
@@ -26,11 +32,23 @@ class BedsUpdate(BaseModel):
     occupied: int = Field(ge=0)
     total: int | None = Field(default=None, ge=0)
 
+    @model_validator(mode="after")
+    def _occupied_within_total(self):
+        if self.total is not None and self.occupied > self.total:
+            raise ValueError("occupied beds cannot exceed total beds")
+        return self
+
 
 class FootfallLog(BaseModel):
-    count: int = Field(ge=0)
+    count: int = Field(ge=0, le=MAX_DAILY_FOOTFALL)
     opd: int = Field(ge=0, default=0)
     ipd: int = Field(ge=0, default=0)
+
+    @model_validator(mode="after")
+    def _breakdown_within_count(self):
+        if self.opd + self.ipd > self.count:
+            raise ValueError("opd + ipd cannot exceed total patient count")
+        return self
 
 
 class AttendanceLog(BaseModel):
@@ -39,9 +57,24 @@ class AttendanceLog(BaseModel):
     nurses_present: int = Field(ge=0, default=0)
     nurses_total: int = Field(ge=0, default=0)
 
+    @model_validator(mode="after")
+    def _present_within_total(self):
+        if self.doctors_present > self.doctors_total:
+            raise ValueError("doctors present cannot exceed total doctors")
+        if self.nurses_present > self.nurses_total:
+            raise ValueError("nurses present cannot exceed total nurses")
+        return self
+
 
 class TestsUpdate(BaseModel):
     tests: dict[str, bool]
+
+    @model_validator(mode="after")
+    def _known_tests_only(self):
+        unknown = set(self.tests) - KNOWN_TESTS
+        if unknown:
+            raise ValueError(f"unknown test(s): {', '.join(sorted(unknown))}")
+        return self
 
 
 class CentreCreate(BaseModel):
