@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.models.schemas import ok
+from app.services import audit
 from app.services.recompute import recompute_centre
 from app.services.sms_report import parse_sms_report
 
@@ -60,6 +61,7 @@ def sms_report(body: SmsReportBody):
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Centre not found")
 
+    district_id = doc.to_dict().get("district_id")
     parsed = parse_sms_report(body.text, _catalog(cref))
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
     for u in parsed["updates"]:
@@ -81,6 +83,11 @@ def sms_report(body: SmsReportBody):
             updates["consumption_history"] = history
             updates["consumption_last_date"] = today
         ref.update(updates)
+        # No per-operator identity on the SMS gateway path — record the channel so
+        # the trail still shows the report arrived via SMS (not an app operator).
+        audit.record("stock_update", body.centre_id, district_id,
+                     {"channel": "sms"}, before=prev.get("current_stock"),
+                     after=new_stock, medicine_id=u["medicine_id"])
 
     if parsed["updates"]:
         recompute_centre(body.centre_id)

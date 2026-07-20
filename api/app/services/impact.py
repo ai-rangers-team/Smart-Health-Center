@@ -27,9 +27,13 @@ _DEFAULT_UNIT_COST = 1.0
 EMERGENCY_PREMIUM = 0.40  # 40%
 
 
-def compute_impact(forecasts: list[dict], recs: list[dict]) -> dict:
+def compute_impact(forecasts: list[dict], recs: list[dict], confirmed: list[dict] | None = None) -> dict:
     """forecasts: flat list across the district (each has `severity` + `days_remaining`).
-    recs: redistribution matches (each has `quantity` + `medicine_id`)."""
+    recs: redistribution matches (each has `quantity` + `medicine_id`) — the identified
+    opportunity. confirmed: transfers a recipient has actually confirmed (each has
+    `received_qty` + `medicine_id`). When any transfers are confirmed, the redistribution
+    impact reflects DELIVERED reality (anti-fraud layer 4: no credit for unverified
+    transfers); otherwise it reflects the opportunity the plan identified."""
     # Shortages caught with a forecast still on the clock (days_remaining is a real
     # number, not a cold-start None and not already at zero) — i.e. flagged early.
     early = [
@@ -41,13 +45,22 @@ def compute_impact(forecasts: list[dict], recs: list[dict]) -> dict:
     lead_times = [f["days_remaining"] for f in early]
     avg_lead = round(sum(lead_times) / len(lead_times), 1) if lead_times else 0.0
 
-    units = sum(r.get("quantity", 0) for r in recs)
+    # Prefer confirmed (delivered) transfers; fall back to the planned opportunity.
+    if confirmed:
+        transfers = [{"medicine_id": c.get("medicine_id"),
+                      "quantity": c.get("received_qty", 0)} for c in confirmed]
+        delivered = True
+    else:
+        transfers = [{"medicine_id": r.get("medicine_id"),
+                      "quantity": r.get("quantity", 0)} for r in recs]
+        delivered = False
 
+    units = sum(tr["quantity"] for tr in transfers)
     patients = 0.0
     rupees = 0.0
-    for r in recs:
-        med = r.get("medicine_id") or ""
-        qty = r.get("quantity", 0)
+    for tr in transfers:
+        med = tr["medicine_id"] or ""
+        qty = tr["quantity"]
         usage = PER_PATIENT_USAGE.get(med, _DEFAULT_USAGE)
         # units moved / (units per patient per day) = patient-days of treatment secured
         patients += qty / usage if usage else 0
@@ -59,4 +72,5 @@ def compute_impact(forecasts: list[dict], recs: list[dict]) -> dict:
         "units_redistributed": round(units),
         "patients_protected": round(patients),
         "rupees_saved": round(rupees),
+        "transfers_confirmed": delivered,
     }

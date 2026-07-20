@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from app.deps import get_current_user, require_own_centre
 from app.models.schemas import (AttendanceLog, BedsUpdate, FootfallLog, StockUpdate,
                                 TestsUpdate, ok)
+from app.services import audit
 from app.services.invoice_extract import extract_restock_items
 from app.services.recompute import recompute_centre
 from app.services.voice_extract import extract_stock_from_speech
@@ -59,6 +60,9 @@ def update_stock(centre_id: str, body: StockUpdate, user=Depends(get_current_use
         updates["consumption_history"] = history
         updates["consumption_last_date"] = today
     ref.update(updates)
+    audit.record("stock_update", centre_id, user.get("district_id"),
+                 audit.actor_from_user(user), before=prev.get("current_stock"),
+                 after=body.current_stock, medicine_id=body.medicine_id)
     return ok({"recomputed": recompute_centre(centre_id)})
 
 
@@ -154,10 +158,14 @@ def update_beds(centre_id: str, body: BedsUpdate, user=Depends(get_current_user)
     require_own_centre(centre_id, user)
     ref = (_db().collection("centres").document(centre_id)
            .collection("beds").document("current"))
-    stored_total = (ref.get().to_dict() or {}).get("total", 0)
-    total = body.total if body.total is not None else stored_total
+    before = ref.get().to_dict() or {}
+    total = body.total if body.total is not None else before.get("total", 0)
     ref.set({"total": total, "occupied": body.occupied,
              "available": max(0, total - body.occupied)}, merge=True)
+    audit.record("beds_update", centre_id, user.get("district_id"),
+                 audit.actor_from_user(user),
+                 before={"total": before.get("total"), "occupied": before.get("occupied")},
+                 after={"total": total, "occupied": body.occupied})
     return ok({"recomputed": recompute_centre(centre_id)})
 
 
@@ -165,9 +173,13 @@ def update_beds(centre_id: str, body: BedsUpdate, user=Depends(get_current_user)
 def log_footfall(centre_id: str, body: FootfallLog, user=Depends(get_current_user)):
     require_own_centre(centre_id, user)
     day = _today()
-    (_db().collection("centres").document(centre_id)
-     .collection("footfall").document(day)
-     .set({"date": day, **body.model_dump()}))
+    fref = (_db().collection("centres").document(centre_id)
+            .collection("footfall").document(day))
+    before = fref.get().to_dict()
+    fref.set({"date": day, **body.model_dump()})
+    audit.record("footfall_log", centre_id, user.get("district_id"),
+                 audit.actor_from_user(user),
+                 before=(before or {}).get("count"), after=body.count)
     return ok({"recomputed": recompute_centre(centre_id)})
 
 
@@ -176,9 +188,14 @@ def log_attendance(centre_id: str, body: AttendanceLog, user=Depends(get_current
     require_own_centre(centre_id, user)
     day = _today()
     rate = body.doctors_present / body.doctors_total
-    (_db().collection("centres").document(centre_id)
-     .collection("attendance").document(day)
-     .set({"date": day, **body.model_dump(), "attendance_rate": rate}))
+    aref = (_db().collection("centres").document(centre_id)
+            .collection("attendance").document(day))
+    before = aref.get().to_dict()
+    aref.set({"date": day, **body.model_dump(), "attendance_rate": rate})
+    audit.record("attendance_log", centre_id, user.get("district_id"),
+                 audit.actor_from_user(user),
+                 before=(before or {}).get("attendance_rate"), after=round(rate, 2),
+                 doctors_present=body.doctors_present, doctors_total=body.doctors_total)
     return ok({"recomputed": recompute_centre(centre_id)})
 
 
@@ -186,7 +203,9 @@ def log_attendance(centre_id: str, body: AttendanceLog, user=Depends(get_current
 def update_tests(centre_id: str, body: TestsUpdate, user=Depends(get_current_user)):
     require_own_centre(centre_id, user)
     cref = _db().collection("centres").document(centre_id)
-    cref.collection("tests").document("current").set(body.tests, merge=True)
+    tref = cref.collection("tests").document("current")
+    before = tref.get().to_dict()
+    tref.set(body.tests, merge=True)
     # Dated snapshot -> a real "test availability audit" trail (spec §4).
     day = _today()
     cref.collection("tests_history").document(day).set({
@@ -194,4 +213,6 @@ def update_tests(centre_id: str, body: TestsUpdate, user=Depends(get_current_use
         "available": body.tests,
         "unavailable_count": sum(1 for v in body.tests.values() if v is False),
     })
+    audit.record("tests_update", centre_id, user.get("district_id"),
+                 audit.actor_from_user(user), before=before, after=body.tests)
     return ok({"recomputed": recompute_centre(centre_id)})

@@ -43,6 +43,10 @@ def compute_redistribution(centres: list[dict]) -> list[dict]:
             recs.append({
                 "from_centre": donor["name"],
                 "to_centre": needy["name"],
+                # Centre ids carried so the recipient operator can be identity-scoped
+                # when confirming receipt (anti-fraud layer 4).
+                "from_centre_id": donor["id"],
+                "to_centre_id": needy["id"],
                 # Human-readable name for instructions/UI; doc id kept for reference
                 "medicine": nd.get("medicine_name", med),
                 "medicine_id": med,

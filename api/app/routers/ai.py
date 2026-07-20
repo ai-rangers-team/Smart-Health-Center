@@ -5,13 +5,15 @@ redistribution) -> enrich with Gemini -> return the standard envelope. Gemini ne
 gates a write here; these are read/advisory endpoints.
 """
 import time
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
 from firebase_admin import firestore
+from pydantic import BaseModel, Field
 
-from app.deps import get_current_user
+from app.deps import get_current_user, require_own_centre
 from app.models.schemas import ok
-from app.services import gemini
+from app.services import audit, gemini
 from app.services.forecasting import forecast_footfall, forecast_stockout
 from app.services.impact import compute_impact
 from app.services.outbreak import MARKERS, detect_outbreaks
@@ -134,7 +136,11 @@ def impact(district_id: str, user=Depends(get_current_user)):
     caught early, lead time bought, and the redistribution opportunity in patients/₹."""
     centres, forecasts = _district_stock(district_id)
     recs = compute_redistribution(centres)
-    return ok(compute_impact(forecasts, recs))
+    # Transfers a recipient has actually confirmed count as delivered impact.
+    confirmed = [r.to_dict() for r in _db().collection("recommendations")
+                 .where(filter=FieldFilter("district_id", "==", district_id))
+                 .where(filter=FieldFilter("status", "in", ["received", "disputed"])).stream()]
+    return ok(compute_impact(forecasts, recs, confirmed=confirmed))
 
 
 @router.post("/redistribution/{district_id}")
@@ -174,6 +180,55 @@ def acknowledge_recommendation(recommendation_id: str, user=Depends(get_current_
     _db().collection("recommendations").document(recommendation_id).update(
         {"status": "acknowledged"})
     return ok({"acknowledged": True})
+
+
+class ReceiptBody(BaseModel):
+    received_qty: float = Field(ge=0)
+
+
+@recs_router.post("/{recommendation_id}/confirm-receipt")
+def confirm_receipt(recommendation_id: str, body: ReceiptBody,
+                    user=Depends(get_current_user)):
+    """Recipient operator confirms how much of a transfer actually arrived (anti-fraud
+    layer 4). Applies the received quantity to the recipient's stock and reconciles it
+    against what the plan said to send — a shortfall marks the transfer DISPUTED, which
+    surfaces to the district officer. Only the recipient centre's own operator may confirm."""
+    from fastapi import HTTPException
+    db = _db()
+    ref = db.collection("recommendations").document(recommendation_id)
+    rec = ref.get().to_dict()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Recommendation not found")
+    to_id = rec.get("to_centre_id")
+    if not to_id:
+        raise HTTPException(status_code=400, detail="Recommendation predates receipt tracking")
+    require_own_centre(to_id, user)  # only the receiving centre's operator
+    if rec.get("status") in ("received", "disputed"):
+        return ok({"status": rec["status"], "already": True})
+
+    medicine_id = rec.get("medicine_id")
+    recommended = rec.get("quantity", 0) or 0
+    received = body.received_qty
+
+    sref = db.collection("centres").document(to_id).collection("stock").document(medicine_id)
+    prev = sref.get().to_dict() or {}
+    new_stock = (prev.get("current_stock", 0) or 0) + received
+    sref.update({"current_stock": new_stock,
+                 "last_updated": datetime.now(timezone.utc).isoformat()})
+
+    shortfall = max(0, recommended - received)
+    status = "disputed" if shortfall > 0 else "received"
+    ref.update({
+        "status": status, "received_qty": received, "shortfall": shortfall,
+        "received_by": user.get("email") or user.get("uid"),
+        "received_at": firestore.SERVER_TIMESTAMP,
+    })
+    audit.record("transfer_receipt", to_id, user.get("district_id"),
+                 audit.actor_from_user(user), before=prev.get("current_stock"),
+                 after=new_stock, medicine_id=medicine_id,
+                 recommended=recommended, received=received, shortfall=shortfall)
+    recompute_centre(to_id)
+    return ok({"status": status, "shortfall": shortfall})
 
 
 @router.post("/explain-underperformance/{centre_id}")

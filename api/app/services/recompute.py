@@ -98,4 +98,22 @@ def recompute_centre(centre_id: str) -> dict:
                                    forecasts, beds, avg_attendance, tests):
         db.collection("alerts").add({**a, "created_at": firestore.SERVER_TIMESTAMP})
 
+    # 6b. Data-integrity checks (anti-fraud): flag suspicious/inconsistent reports as
+    # advisory DATA_INTEGRITY alerts for the district officer to spot-inspect.
+    from app.services.integrity import check_integrity
+    base = {"centre_id": centre_id, "centre_name": centre.get("name"),
+            "district_id": centre.get("district_id"), "resolved": False}
+    for fl in check_integrity(
+        medicines=[{"medicine_name": f["medicine_name"],
+                    "daily_rate": f.get("daily_consumption_forecast", 0)} for f in forecasts],
+        avg_footfall=avg_footfall, foot_counts=foot_counts, avg_attendance=avg_attendance,
+    ):
+        db.collection("alerts").add({**base, "type": "DATA_INTEGRITY", "severity": "medium",
+                                     **fl, "created_at": firestore.SERVER_TIMESTAMP})
+
+    # 6c. Re-evaluate citizen disputes (they were deleted with the alerts above, so
+    # regenerate them here to survive operator writes).
+    from app.services.citizen import refresh_disputes
+    refresh_disputes(centre_id)
+
     return {**score, "status": status}
