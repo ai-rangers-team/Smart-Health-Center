@@ -132,6 +132,38 @@ export const PREVIEW_API = {
     ],
     unmatched: [],
   },
+  adminSystem: {
+    api: { ok: true, time: "2026-08-02" },
+    firestore: { ok: true, read_ms: 42 },
+    gemini: { model: "gemini-2.5-flash", auth: "api_key" },
+    briefing_cache: { pune_rural: ["en", "hi", "mr"] },
+    alerts: { total: 6, by_severity: { critical: 2, high: 2, medium: 2 }, disputes: 1, integrity: 1 },
+    attention: {
+      silent_centres: [{ id: "phc_velhe", name: "PHC Velhe", district_id: "pune_rural", last_report: "2026-07-29", days_silent: 4 }],
+      weak_centres: [{ id: "phc_velhe", name: "PHC Velhe", district_id: "pune_rural", score: 38, status: "under_resourced" }],
+      users_never_signed_in: ["devikbansal14@gmail.com"],
+    },
+    feedback_today: 7,
+    centres: [
+      { id: "phc_velhe", name: "PHC Velhe", district_id: "pune_rural", status: "under_resourced", score: 38, footfall_today: 40 },
+      { id: "phc_mulshi", name: "PHC Mulshi", district_id: "pune_rural", status: "critical", score: 55, footfall_today: 82 },
+      { id: "phc_haveli", name: "PHC Haveli", district_id: "pune_rural", status: "critical", score: 58, footfall_today: 74 },
+      { id: "phc_ambegaon", name: "PHC Ambegaon", district_id: "pune_rural", status: "warning", score: 72, footfall_today: 70 },
+      { id: "phc_bhor", name: "PHC Bhor", district_id: "pune_rural", status: "operational", score: 88, footfall_today: 61 },
+      { id: "chc_pune_rural", name: "Pune Rural CHC", district_id: "pune_rural", status: "operational", score: 91, footfall_today: 140 },
+    ],
+  },
+  adminUsers: { users: [
+    { email: "devikbansal14@gmail.com", role: "phc_operator", centre_id: "phc_haveli", district_id: "pune_rural", signed_in: false },
+    { email: "ishadesai53@gmail.com", role: "district_admin", centre_id: null, district_id: "pune_rural", signed_in: true },
+    { email: "rishimishra1508@gmail.com", role: "super_admin", centre_id: null, district_id: null, signed_in: true },
+    { email: "rupeshsharma137@gmail.com", role: "district_admin", centre_id: null, district_id: "pune_rural", signed_in: true },
+  ] },
+  adminAudit: { entries: [
+    { id: "e1", action: "stock_update", centre_id: "phc_mulshi", actor: { email: "rishi.mishra@wonderlendhubs.com", channel: "app" }, before: 120, after: 620, at: "2026-08-02T09:14:03" },
+    { id: "e2", action: "admin_role_set", centre_id: "-", actor: { email: "rishimishra1508@gmail.com", channel: "admin" }, before: { role: "district_admin" }, after: { role: "phc_operator", centre_id: "phc_haveli" }, at: "2026-08-01T18:20:11" },
+    { id: "e3", action: "footfall_log", centre_id: "phc_haveli", actor: { email: "devikbansal14@gmail.com", channel: "sms" }, before: null, after: 74, at: "2026-08-01T10:02:44" },
+  ] },
   report: {
     district_id: "pune_rural", district_name: "Pune Rural District",
     period: { from: "2026-07-03", to: "2026-08-01", days: 30 },

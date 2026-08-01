@@ -210,21 +210,25 @@ def _roles_collection():
 
 
 def _load_roles() -> dict:
-    """Read email -> (role, centre_id) from Firestore, seeding DEFAULT_ROLES
-    into it the first time the collection is empty."""
+    """Read email -> (role, centre_id, district_id) from Firestore, seeding
+    DEFAULT_ROLES into it the first time the collection is empty."""
     docs = list(_roles_collection().stream())
     if not docs:
         for email, (role, centre_id) in DEFAULT_ROLES.items():
-            set_role(email, role, centre_id)
+            set_role(email, role, centre_id, DISTRICT["id"])
         docs = list(_roles_collection().stream())
-    return {d.id: (d.to_dict()["role"], d.to_dict().get("centre_id")) for d in docs}
+    return {d.id: (d.to_dict()["role"], d.to_dict().get("centre_id"),
+                   d.to_dict().get("district_id")) for d in docs}
 
 
-def set_role(email: str, role: str, centre_id: str | None = None):
+def set_role(email: str, role: str, centre_id: str | None = None,
+             district_id: str | None = None):
     """Add/update a role assignment. This is the DB-backed replacement for
     editing DEFAULT_ROLES in code — call this (or edit the `roles` collection
-    in the Firestore console) instead of changing this file."""
-    _roles_collection().document(email).set({"role": role, "centre_id": centre_id})
+    in the Firestore console) instead of changing this file. district_id is
+    stored so a multi-district deployment can tell whose user is whose."""
+    _roles_collection().document(email).set(
+        {"role": role, "centre_id": centre_id, "district_id": district_id})
 
 
 def provision_account(email: str, role: str, district_id: str, centre_id: str | None) -> bool:
@@ -232,7 +236,7 @@ def provision_account(email: str, role: str, district_id: str, centre_id: str | 
     collection (source of truth), so accounts that haven't signed in yet get
     their claims on the next provision_accounts() run. Returns False for the
     never-signed-in case (soft skip, not an error)."""
-    set_role(email, role, centre_id)
+    set_role(email, role, centre_id, district_id)
     try:
         u = auth.get_user_by_email(email)
         auth.set_custom_user_claims(u.uid, {
@@ -246,8 +250,8 @@ def provision_accounts():
     """Attach role custom-claims to accounts (from the `roles` Firestore
     collection) that exist in Firebase Auth."""
     done, skipped = [], []
-    for email, (role, centre_id) in _load_roles().items():
-        if provision_account(email, role, DISTRICT["id"], centre_id):
+    for email, (role, centre_id, district_id) in _load_roles().items():
+        if provision_account(email, role, district_id or DISTRICT["id"], centre_id):
             done.append(email)
         else:
             skipped.append(email)  # must sign in once first, then re-run

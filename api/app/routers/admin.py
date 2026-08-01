@@ -68,7 +68,7 @@ def list_users(user=Depends(require_super_admin)):
     for d in _db().collection("roles").stream():
         r = d.to_dict() or {}
         entry = {"email": d.id, "role": r.get("role"), "centre_id": r.get("centre_id"),
-                 "signed_in": False}
+                 "district_id": r.get("district_id"), "signed_in": False}
         try:
             fb_auth.get_user_by_email(d.id)
             entry["signed_in"] = True
@@ -256,6 +256,91 @@ def remove_medicine(centre_id: str, med_id: str, user=Depends(require_super_admi
                  audit.actor_from_user(user, channel="admin"),
                  before={"id": med_id, "name": before.get("medicine_name")}, after=None)
     return ok({"removed": med_id})
+
+
+# ---------- system / observability ----------
+
+@router.get("/system")
+def system_status(user=Depends(require_super_admin)):
+    """Technical + operational health in one call: platform diagnostics, alert
+    load, and the 'needs attention' list (silent centres, weak scores, open
+    accountability flags, users who never signed in)."""
+    import time
+    from datetime import date, timedelta
+
+    from firebase_admin import firestore
+
+    from app.config import settings
+
+    db = _db()
+    t0 = time.perf_counter()
+    districts = [{"id": d.id, **(d.to_dict() or {})} for d in db.collection("districts").stream()]
+    firestore_ms = round((time.perf_counter() - t0) * 1000)
+
+    centres = [{"id": c.id, **(c.to_dict() or {})} for c in db.collection("centres").stream()]
+
+    alerts = [a.to_dict() for a in db.collection("alerts")
+              .where(filter=FieldFilter("resolved", "==", False)).stream()]
+    by_severity: dict[str, int] = {}
+    for a in alerts:
+        s = a.get("severity", "other")
+        by_severity[s] = by_severity.get(s, 0) + 1
+
+    # Which centres have gone quiet? (no daily report in the last 2 days)
+    today = date.today()
+    stale_cutoff = (today - timedelta(days=2)).isoformat()
+    silent = []
+    for c in centres:
+        latest = list(db.collection("centres").document(c["id"]).collection("footfall")
+                      .order_by("date", direction=firestore.Query.DESCENDING)
+                      .limit(1).stream())
+        last_date = (latest[0].to_dict() or {}).get("date") if latest else None
+        if not last_date or last_date < stale_cutoff:
+            days_silent = ((today - date.fromisoformat(last_date)).days
+                           if last_date else None)
+            silent.append({"id": c["id"], "name": c.get("name"),
+                           "district_id": c.get("district_id"),
+                           "last_report": last_date, "days_silent": days_silent})
+
+    weak = sorted(
+        [{"id": c["id"], "name": c.get("name"), "district_id": c.get("district_id"),
+          "score": c.get("performance_score"), "status": c.get("status")}
+         for c in centres if (c.get("performance_score") or 100) < 60
+         or c.get("status") in ("critical", "under_resourced")],
+        key=lambda x: x["score"] or 0)
+
+    never_signed_in = []
+    for d in db.collection("roles").stream():
+        try:
+            fb_auth.get_user_by_email(d.id)
+        except fb_auth.UserNotFoundError:
+            never_signed_in.append(d.id)
+        except Exception:
+            pass
+
+    feedback_today = len(list(db.collection("citizen_feedback")
+                              .where(filter=FieldFilter("date", "==", today.isoformat()))
+                              .stream()))
+
+    briefing_cache = {d["id"]: sorted((d.get("last_briefing") or {}).keys())
+                      for d in districts}
+
+    return ok({
+        "api": {"ok": True, "time": today.isoformat()},
+        "firestore": {"ok": True, "read_ms": firestore_ms},
+        "gemini": {"model": settings.gemini_model,
+                   "auth": "api_key" if settings.gemini_api_key else "vertex_service_account"},
+        "briefing_cache": briefing_cache,
+        "alerts": {"total": len(alerts), "by_severity": by_severity,
+                   "disputes": sum(1 for a in alerts if a.get("type") == "CITIZEN_DISPUTE"),
+                   "integrity": sum(1 for a in alerts if a.get("type") == "DATA_INTEGRITY")},
+        "attention": {"silent_centres": silent, "weak_centres": weak,
+                      "users_never_signed_in": never_signed_in},
+        "feedback_today": feedback_today,
+        "centres": [{"id": c["id"], "name": c.get("name"), "district_id": c.get("district_id"),
+                     "status": c.get("status"), "score": c.get("performance_score"),
+                     "footfall_today": c.get("footfall_today")} for c in centres],
+    })
 
 
 # ---------- audit trail (read-only) ----------

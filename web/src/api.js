@@ -11,6 +11,19 @@ if (PREVIEW) {
   const lang = (url) => new URLSearchParams(url.split("?")[1] || "").get("lang") || "mr";
   api.get = async (url) => {
     if (url.includes("/report?")) return PREVIEW_API.report;
+    if (url.includes("/api/admin/system")) return PREVIEW_API.adminSystem;
+    if (url.includes("/api/admin/overview"))
+      return { districts: [{ id: "pune_rural", name: "Pune Rural District", state: "Maharashtra", default_language: "mr", centres: 6 }], total_centres: 6, total_users: 6 };
+    if (url.includes("/api/admin/centres-list"))
+      return { centres: PREVIEW_API.report.centres.map((c) => ({ id: c.id, name: c.name, district_id: "pune_rural" })) };
+    if (url.includes("/api/admin/users")) return PREVIEW_API.adminUsers;
+    if (url.includes("/api/admin/audit")) return PREVIEW_API.adminAudit;
+    if (url.includes("/api/admin/centres/"))
+      return { medicines: [
+        { id: "paracetamol", medicine_name: "Paracetamol 500mg", unit: "tablets", current_stock: 120, min_threshold: 120, reorder_level: 280 },
+        { id: "ors", medicine_name: "ORS Sachets", unit: "sachets", current_stock: 340, min_threshold: 72, reorder_level: 168 },
+        { id: "ifa", medicine_name: "Iron + Folic Acid", unit: "tablets", current_stock: 450, min_threshold: 168, reorder_level: 392 },
+      ] };
     if (url.includes("/api/ai/impact/")) return PREVIEW_API.impact;
     if (url.includes("/api/ai/outbreak/")) return { outbreaks: PREVIEW_API.outbreaks };
     if (url.includes("/api/public/centre/")) return PREVIEW_API.publicCentre;
