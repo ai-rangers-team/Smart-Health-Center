@@ -3,7 +3,7 @@ import { useLang } from "../i18n/translations";
 
 /* Small shared atoms, ported 1:1 from the approved design system. */
 
-const LANG_NAMES = { en: "English", hi: "हिंदी", mr: "मराठी" };
+const LANG_NAMES = { en: "English", hi: "हिंदी", mr: "मराठी", te: "తెలుగు" };
 
 export function LanguageSwitch({ onDark = false }) {
   const { lang, setLang } = useLang();

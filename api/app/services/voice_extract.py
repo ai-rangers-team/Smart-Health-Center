@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from app.config import settings
 from app.services.gemini import _get_client
 
-_LANG = {"en": "English", "hi": "Hindi", "mr": "Marathi"}
+_LANG = {"en": "English", "hi": "Hindi", "mr": "Marathi", "te": "Telugu"}
 
 
 class SpokenItem(BaseModel):

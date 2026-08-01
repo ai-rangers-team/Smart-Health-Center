@@ -7,6 +7,8 @@ to enter it manually.
 
 STATE_LANGUAGE = {
     "Maharashtra": "mr",
+    "Andhra Pradesh": "te",
+    "Telangana": "te",
 }
 
 

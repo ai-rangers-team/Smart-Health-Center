@@ -8,7 +8,7 @@ so a Gemini hiccup can never break a request.
 from google import genai
 from app.config import settings
 
-_LANG = {"en": "English", "hi": "Hindi", "mr": "Marathi"}
+_LANG = {"en": "English", "hi": "Hindi", "mr": "Marathi", "te": "Telugu"}
 
 _client = None
 
