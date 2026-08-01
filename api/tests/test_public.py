@@ -126,5 +126,6 @@ def test_public_centre_404_when_missing(monkeypatch):
 def test_feedback_404_when_centre_missing(monkeypatch):
     _install(monkeypatch, exists=False)
     r = _client().post("/api/public/centre/nope/feedback",
-                       json={"doctor_present": False, "medicine_available": True})
+                       json={"doctor_present": False, "medicine_available": True,
+                             "device": "testdevice1"})
     assert r.status_code == 404

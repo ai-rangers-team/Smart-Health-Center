@@ -212,6 +212,12 @@ export default function Dashboard() {
               <p className="text-xs text-ondark-subtle">{t("district_officer")}</p>
             </div>
             <Link
+              to="/reports"
+              className="rounded-headerpill bg-white/10 px-3.5 py-2 text-sm font-medium text-white hover:bg-white/20"
+            >
+              {t("reports_title")}
+            </Link>
+            <Link
               to="/onboard-centre"
               className="rounded-headerpill bg-white/10 px-3.5 py-2 text-sm font-medium text-white hover:bg-white/20"
             >

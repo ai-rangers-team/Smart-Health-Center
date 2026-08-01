@@ -22,12 +22,25 @@ export default function PublicCentre() {
   const [fb, setFb] = useState({ doctor: null, medicine: null });
   const [fbDone, setFbDone] = useState(false);
 
+  // Anonymous per-browser token (no PII) — lets the backend count each device
+  // once per day, so one phone can't manufacture a dispute against a centre.
+  function deviceToken() {
+    let tok = localStorage.getItem("shc_device");
+    if (!tok) {
+      tok = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+        (b) => b.toString(16).padStart(2, "0")).join("");
+      localStorage.setItem("shc_device", tok);
+    }
+    return tok;
+  }
+
   async function submitFeedback() {
     if (fb.doctor === null || fb.medicine === null) return;
     try {
       await api.post(`/api/public/centre/${centreId}/feedback`, {
         doctor_present: fb.doctor,
         medicine_available: fb.medicine,
+        device: deviceToken(),
       });
     } catch {
       /* best-effort — still thank the citizen */

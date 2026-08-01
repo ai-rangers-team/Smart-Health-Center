@@ -8,6 +8,8 @@ import MyCentre from "./pages/MyCentre";
 import OnboardCentre from "./pages/OnboardCentre";
 import PublicCentre from "./pages/PublicCentre";
 import SmsDemo from "./pages/SmsDemo";
+import Reports from "./pages/Reports";
+import Admin from "./pages/Admin";
 
 export default function App() {
   const { user, role, loading, signIn, signOut } = useAuth();
@@ -40,6 +42,16 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/centre/:centreId" element={<CentreDetail />} />
         <Route path="/onboard-centre" element={<OnboardCentre />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
+  if (role === "super_admin") {
+    return (
+      <Routes>
+        <Route path="/" element={<Admin />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

@@ -4,5 +4,7 @@ export const PREVIEW =
 
 export function previewRole() {
   const q = new URLSearchParams(window.location.search).get("role");
-  return q === "operator" ? "phc_operator" : "district_admin";
+  if (q === "operator") return "phc_operator";
+  if (q === "super") return "super_admin";
+  return "district_admin";
 }

@@ -13,8 +13,8 @@ called both when a citizen submits feedback and during recompute-on-write.
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-DISPUTE_THRESHOLD = 3   # this many contradicting citizen reports raises a flag
-_RECENT = 20            # look at the most recent N reports
+DISPUTE_THRESHOLD = 3   # this many DISTINCT devices must contradict to raise a flag
+_RECENT = 40            # look at the most recent N reports
 
 
 def _db():
@@ -22,11 +22,23 @@ def _db():
     return db
 
 
+def _distinct_negatives(feedbacks, field):
+    """Count contradicting reports by DISTINCT device, so one person tapping
+    'No' repeatedly (or a scripted burst from one phone) counts once. Feedback
+    with no device token shares a single anonymous bucket — legacy rows can
+    never outvote real devices."""
+    devices = set()
+    for f in feedbacks:
+        if f.get(field) is False:
+            devices.add(f.get("device") or "_anonymous")
+    return len(devices)
+
+
 def evaluate_disputes(feedbacks, *, doctor_claimed_present, medicines_claimed_available):
-    """feedbacks: recent [{doctor_present: bool, medicine_available: bool}].
+    """feedbacks: recent [{doctor_present: bool, medicine_available: bool, device?: str}].
     Returns dispute flag dicts only where citizens contradict the operator's claim."""
-    no_doctor = sum(1 for f in feedbacks if f.get("doctor_present") is False)
-    no_med = sum(1 for f in feedbacks if f.get("medicine_available") is False)
+    no_doctor = _distinct_negatives(feedbacks, "doctor_present")
+    no_med = _distinct_negatives(feedbacks, "medicine_available")
     flags = []
     if doctor_claimed_present and no_doctor >= DISPUTE_THRESHOLD:
         flags.append({

@@ -8,7 +8,8 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.config import settings
-from app.routers import ai, alerts, centres, dashboard, operator, public, seed, sms
+from app.routers import (admin, ai, alerts, centres, dashboard, operator, public,
+                         reports, seed, sms)
 
 # 60 req/min per client IP across the API — enough for normal dashboard use,
 # blocks abuse of the Gemini-backed endpoints.
@@ -57,6 +58,8 @@ def create_app() -> FastAPI:
     app.include_router(ai.recs_router)
     app.include_router(public.router)
     app.include_router(sms.router)
+    app.include_router(reports.router)
+    app.include_router(admin.router)
     app.include_router(seed.router)
 
     if os.path.isdir("static"):

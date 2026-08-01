@@ -45,3 +45,25 @@ def require_role(role: str):
 def require_own_centre(centre_id: str, user: dict):
     if user.get("role") != "phc_operator" or user.get("centre_id") != centre_id:
         raise HTTPException(status_code=403, detail="Not your centre")
+
+
+def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    """District admin or super admin."""
+    if user.get("role") not in ("district_admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return user
+
+
+def require_super_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role") != "super_admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return user
+
+
+def require_district_access(district_id: str, user: dict):
+    """A district admin may only touch their own district; a super admin any."""
+    if user.get("role") == "super_admin":
+        return
+    if user.get("role") == "district_admin" and user.get("district_id") == district_id:
+        return
+    raise HTTPException(status_code=403, detail="Forbidden")

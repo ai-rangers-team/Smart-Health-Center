@@ -10,6 +10,7 @@ if (PREVIEW) {
   // Dev-only: canned AI responses so screens render without the backend.
   const lang = (url) => new URLSearchParams(url.split("?")[1] || "").get("lang") || "mr";
   api.get = async (url) => {
+    if (url.includes("/report?")) return PREVIEW_API.report;
     if (url.includes("/api/ai/impact/")) return PREVIEW_API.impact;
     if (url.includes("/api/ai/outbreak/")) return { outbreaks: PREVIEW_API.outbreaks };
     if (url.includes("/api/public/centre/")) return PREVIEW_API.publicCentre;
